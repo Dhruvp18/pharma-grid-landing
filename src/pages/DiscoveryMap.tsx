@@ -6,7 +6,7 @@ import "@maptiler/sdk/dist/maptiler-sdk.css";
 import { getNearbyEquipment, MedicalEquipment } from '../data/dummyEquipment';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Phone, Locate, Search } from 'lucide-react';
+import { MapPin, Navigation, Phone, Locate, Search, Clock } from 'lucide-react';
 import { toast } from "sonner";
 
 const DiscoveryMap = () => {
@@ -20,9 +20,84 @@ const DiscoveryMap = () => {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [locationSearchQuery, setLocationSearchQuery] = useState("");
+    // Store ETAs for all items: itemId -> etaString
+    const [etas, setEtas] = useState<Record<string, string>>({});
 
     // REPLACE WITH YOUR ACTUAL API KEY
     maptilersdk.config.apiKey = import.meta.env.VITE_MAPTILER_API_KEY;
+
+    // Helper: Haversine Distance in km
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371; // Radius of the earth in km
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in km
+    };
+
+    // Calculate fallback ETA based on 30km/h average speed
+    const getFallbackEta = (startLat: number, startLon: number, endLat: number, endLon: number) => {
+        const distKm = calculateDistance(startLat, startLon, endLat, endLon);
+        // Assume 30 km/h average speed in city
+        const hours = distKm / 30;
+        const minutes = Math.round(hours * 60);
+
+        if (minutes < 1) return "< 1 min";
+        if (minutes < 60) return `${minutes} mins (approx)`;
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return `${h} hr ${m} mins (approx)`;
+    };
+
+    // Fetch ETAs for all filtered items
+    useEffect(() => {
+        if (!userLocation || filteredEquipment.length === 0) return;
+
+        const fetchAllEtas = async () => {
+            const newEtas: Record<string, string> = {};
+
+            // We'll process in parallel but catch errors individually
+            const promises = filteredEquipment.map(async (item) => {
+                try {
+                    // Try Real API
+                    const response = await fetch(
+                        `https://api.maptiler.com/directions/driving/${userLocation.lon},${userLocation.lat};${item.lon},${item.lat}?key=${maptilersdk.config.apiKey}`
+                    );
+
+                    if (!response.ok) throw new Error('API Error');
+
+                    const data = await response.json();
+                    if (data.routes && data.routes.length > 0) {
+                        const durationSeconds = data.routes[0].duration;
+                        const minutes = Math.round(durationSeconds / 60);
+                        if (minutes < 60) {
+                            newEtas[item.id] = `${minutes} mins`;
+                        } else {
+                            const hours = Math.floor(minutes / 60);
+                            const remainingMins = minutes % 60;
+                            newEtas[item.id] = `${hours} hr ${remainingMins} mins`;
+                        }
+                    } else {
+                        // Fallback if no route found
+                        newEtas[item.id] = getFallbackEta(userLocation.lat, userLocation.lon, item.lat, item.lon);
+                    }
+                } catch (error) {
+                    // Fallback on error
+                    newEtas[item.id] = getFallbackEta(userLocation.lat, userLocation.lon, item.lat, item.lon);
+                }
+            });
+
+            await Promise.all(promises);
+            setEtas(prev => ({ ...prev, ...newEtas }));
+        };
+
+        fetchAllEtas();
+    }, [userLocation, filteredEquipment]);
+
 
     // Update markers when filtered equipment changes
     useEffect(() => {
@@ -46,7 +121,7 @@ const DiscoveryMap = () => {
                 .addTo(map.current!);
 
             marker.getElement().addEventListener('click', () => {
-                setSelectedId(item.id);
+                flyToLocation(item.lat, item.lon, item.id);
             });
 
             markers.current.push(marker);
@@ -325,6 +400,15 @@ const DiscoveryMap = () => {
                                 <CardContent>
                                     <p className="text-sm text-gray-600 font-medium">{item.hospitalName}</p>
                                     <p className="text-xs text-gray-500 mb-2">{item.address}</p>
+
+                                    {/* ETA Display for ALL Items */}
+                                    <div className="flex items-center gap-2 text-sm text-blue-600 my-2 bg-blue-50 p-2 rounded">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="font-medium">
+                                            {etas[item.id] ? `Est. Travel: ${etas[item.id]}` : "Calculating ETA..."}
+                                        </span>
+                                    </div>
+
                                     <div className="flex items-center justify-between mt-3">
                                         <span className="font-bold text-primary">${item.pricePerDay}/day</span>
                                         <div className="flex gap-2">

@@ -49,7 +49,36 @@ const ListDevice = () => {
         description: "",
         price: "",
         location: "",
+        contact_email: "",
+        contact_phone: "",
     });
+
+    // Fetch Profile for Defaults
+    useEffect(() => {
+        const getProfile = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                // Default email from auth
+                let email = session.user.email || "";
+                let phone = "";
+
+                // Fetch details from profiles table
+                const { data } = await supabase.from("profiles").select("phone, email").eq("id", session.user.id).single();
+                if (data) {
+                    if (data.phone) phone = data.phone;
+                    // If profile has email override, use it, else keep auth email
+                    // The user said "email address of login", so auth email is primary default.
+                }
+
+                setFormData(prev => ({
+                    ...prev,
+                    contact_email: email,
+                    contact_phone: phone
+                }));
+            }
+        };
+        getProfile();
+    }, []);
 
     // Audit State
     const [auditResult, setAuditResult] = useState<any>(null);
@@ -147,6 +176,8 @@ const ListDevice = () => {
         data.append("description", formData.description);
         data.append("price", formData.price);
         data.append("location", formData.location);
+        data.append("contact_email", formData.contact_email);
+        data.append("contact_phone", formData.contact_phone);
         if (locationCoords) {
             data.append("lat", locationCoords.lat.toString());
             data.append("lng", locationCoords.lng.toString());
@@ -518,6 +549,27 @@ const ListDevice = () => {
                                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                             </div>
                         )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                    <div className="space-y-2">
+                        <Label htmlFor="contact_email">Contact Email</Label>
+                        <Input
+                            id="contact_email"
+                            placeholder="your@email.com"
+                            value={formData.contact_email}
+                            onChange={(e) => handleInputChange("contact_email", e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="contact_phone">Contact Phone</Label>
+                        <Input
+                            id="contact_phone"
+                            placeholder="+91..."
+                            value={formData.contact_phone}
+                            onChange={(e) => handleInputChange("contact_phone", e.target.value)}
+                        />
                     </div>
                 </div>
             </div>

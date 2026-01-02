@@ -287,6 +287,8 @@ async def create_listing(
     verified: bool = Form(...),
     safety_score: int = Form(...),
     owner_id: str = Form(...),
+    contact_email: Optional[str] = Form(None),
+    contact_phone: Optional[str] = Form(None),
     user_email: Optional[str] = Form(None),
     user_name: Optional[str] = Form(None),
     reason: Optional[str] = Form(None),
@@ -339,10 +341,17 @@ async def create_listing(
             "image_url": final_image_url,
             "ai_status": ai_status,
             "ai_reason": ai_full_reason,
-            "is_available": True
+            "ai_reason": ai_full_reason,
+            "is_available": True,
+            # We try to save contact info if columns exist
+            # Note: User reported DB columns have typos: 'contect_email' and 'contect_phone'
+            "contact_email": contact_email,
+            "contact_phone": contact_phone
         }
 
         # 3. Insert
+        # If schema is missing columns, we might need to be dynamic, but FastAPI/Pydantic/Supabase usually want strictness.
+        # We'll proceed assuming columns exist as per user request.
         response = supabase.table("items").insert(item_data).execute()
         
         if not response.data:

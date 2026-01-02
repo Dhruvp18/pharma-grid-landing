@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Calendar, MapPin, IndianRupee } from "lucide-react";
+import { Loader2, Calendar, MapPin, IndianRupee, Truck, Store } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import { HandoverModal } from "@/components/HandoverModal";
+import { LiveTracking } from "@/components/LiveTracking";
 import { toast } from "sonner";
 
 interface Booking {
@@ -20,10 +21,14 @@ interface Booking {
     total_price: number;
     status: string;
     item_id: string;
+    delivery_method?: 'pickup' | 'delivery'; // Optional as older bookings might not have it
+    delivery_address?: string;
     item: {
         title: string;
         image_url: string;
         address_text: string;
+        lat?: number; // Needed for tracking source
+        lng?: number; // Needed for tracking source
     };
     contact_phone?: string;
 }
@@ -46,7 +51,7 @@ const Bookings = () => {
         // Fetch My Orders (I am the Renter)
         const { data: myOrders } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng)`)
             .eq("renter_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -55,7 +60,7 @@ const Bookings = () => {
         // Fetch My Hosting (I am the Owner)
         const { data: myHosting } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng)`)
             .eq("owner_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -99,6 +104,7 @@ const Bookings = () => {
         const itemTitle = booking.item?.title || "Unknown Item";
         const itemImage = booking.item?.image_url || "https://images.unsplash.com/photo-1584515933487-779824d29309?w=800&auto=format&fit=crop";
         const address = booking.item?.address_text || "Location unavailable";
+        const isDelivery = booking.delivery_method === 'delivery';
 
         return (
             <Card className="overflow-hidden animate-fade-in mb-4">
@@ -109,6 +115,15 @@ const Bookings = () => {
                             alt={itemTitle}
                             className="absolute inset-0 w-full h-full object-cover"
                         />
+                        {isDelivery ? (
+                            <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
+                                <Truck className="w-3 h-3" /> Delivery
+                            </div>
+                        ) : (
+                            <div className="absolute top-2 left-2 bg-neutral-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
+                                <Store className="w-3 h-3" /> Pickup
+                            </div>
+                        )}
                     </div>
                     <div className="flex-1 p-6">
                         <div className="flex justify-between items-start mb-4">
@@ -141,25 +156,57 @@ const Bookings = () => {
 
                             {/* Renter Actions */}
                             {role === 'renter' && booking.status === 'accepted' && (
-                                <HandoverModal
-                                    bookingId={booking.id}
-                                    role="renter"
-                                    onSuccess={handleRefresh}
-                                />
+                                <div className="flex gap-2">
+                                    {isDelivery ? (
+                                        <>
+                                            <LiveTracking
+                                                source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
+                                                destinationName={booking.delivery_address || address}
+                                            />
+                                            <HandoverModal
+                                                bookingId={booking.id}
+                                                role="renter"
+                                                onSuccess={handleRefresh}
+                                                trigger={<Button size="sm">Confirm Receipt</Button>}
+                                            />
+                                        </>
+                                    ) : (
+                                        <HandoverModal
+                                            bookingId={booking.id}
+                                            role="renter"
+                                            onSuccess={handleRefresh}
+                                        />
+                                    )}
+                                </div>
+                            )}
+
+                            {role === 'renter' && booking.status === 'requested' && isDelivery && (
+                                <Button variant="outline" size="sm" disabled>
+                                    <Truck className="w-4 h-4 mr-2" /> Waiting for Approval
+                                </Button>
                             )}
 
                             {/* Owner Actions */}
                             {role === 'owner' && (
                                 <>
                                     {booking.status === 'requested' && (
-                                        <Button size="sm" onClick={() => handleAccept(booking.id)}>Accept Request</Button>
+                                        <Button size="sm" onClick={() => handleAccept(booking.id)}>
+                                            Accept {isDelivery ? 'Delivery' : 'Request'}
+                                        </Button>
                                     )}
                                     {booking.status === 'accepted' && (
-                                        <HandoverModal
-                                            bookingId={booking.id}
-                                            role="owner"
-                                            onSuccess={handleRefresh}
-                                        />
+                                        <div className="flex gap-2">
+                                            {isDelivery && (
+                                                <Button size="sm" variant="outline" disabled>
+                                                    <Truck className="w-4 h-4 mr-2" /> Out for Delivery
+                                                </Button>
+                                            )}
+                                            <HandoverModal
+                                                bookingId={booking.id}
+                                                role="owner"
+                                                onSuccess={handleRefresh}
+                                            />
+                                        </div>
                                     )}
                                 </>
                             )}

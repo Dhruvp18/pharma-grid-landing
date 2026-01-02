@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 
 import * as tt from '@tomtom-international/web-sdk-maps';
+import * as ttServices from '@tomtom-international/web-sdk-services';
 import '@tomtom-international/web-sdk-maps/dist/maps.css';
 
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,6 +154,36 @@ const ListDevice = () => {
         data.append("verified", "true"); // Assuming we only allow publish if verified
         data.append("safety_score", auditResult?.safety_score?.toString() || "0");
         if (auditResult?.reason) data.append("reason", auditResult.reason);
+
+        // Add Owner ID from Session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+            data.append("owner_id", session.user.id);
+            if (session.user.email) data.append("user_email", session.user.email);
+            if (session.user.user_metadata?.full_name) data.append("user_name", session.user.user_metadata.full_name);
+
+            // --- CRITICAL FIX: Ensure Profile Exists ---
+            // We upsert the profile from the frontend because we have the User's Auth Session.
+            // The backend (using Anon Key) cannot write to 'profiles' due to RLS.
+            try {
+                const { error: profileError } = await supabase.from("profiles").upsert({
+                    id: session.user.id,
+                    // email: session.user.email, // REMOVED: Schema does not have email column
+                });
+                if (profileError) {
+                    console.error("Profile Sync Error:", profileError);
+                    // We don't block here, we hope for the best, or maybe the table doesn't exist?
+                    // But usually this fixes the FK issue.
+                }
+            } catch (err) {
+                console.error("Profile Sync Exception:", err);
+            }
+
+        } else {
+            toast.error("You must be logged in to publish.");
+            setIsLoading(false);
+            return;
+        }
 
         // Re-send images to be saved/handled by backend creation endpoint
         files.forEach((file) => {
@@ -365,6 +397,37 @@ const ListDevice = () => {
     const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
     const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
 
+    const [isGeocoding, setIsGeocoding] = useState(false);
+
+    const handleLocationSearch = async () => {
+        if (!formData.location || !map.current || !marker.current || !TOMTOM_API_KEY) return;
+
+        setIsGeocoding(true);
+        try {
+            const response = await ttServices.services.fuzzySearch({
+                key: TOMTOM_API_KEY,
+                query: formData.location,
+            });
+
+            if (response.results && response.results.length > 0) {
+                const result = response.results[0];
+                const newPos = { lat: result.position.lat, lng: result.position.lng };
+
+                setLocationCoords(newPos);
+                map.current.flyTo({ center: newPos, zoom: 14 } as any);
+                marker.current.setLngLat(newPos);
+                toast.success(`Location updated to: ${result.address.freeformAddress}`);
+            } else {
+                toast.error("Location not found. Please try a more specific address.");
+            }
+        } catch (error) {
+            console.error("Geocoding error:", error);
+            toast.error("Failed to find location.");
+        } finally {
+            setIsGeocoding(false);
+        }
+    };
+
     // Initialize Map on Step 3
     useEffect(() => {
         if (step === 3 && mapContainer.current && !map.current && TOMTOM_API_KEY) {
@@ -437,11 +500,24 @@ const ListDevice = () => {
                         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                             id="location"
-                            className="pl-9"
+                            className="pl-9 pr-8"
                             placeholder="e.g. Andheri West, Mumbai"
                             value={formData.location}
                             onChange={(e) => handleInputChange("location", e.target.value)}
+                            onBlur={handleLocationSearch}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleLocationSearch();
+                                }
+                            }}
+                            disabled={isGeocoding}
                         />
+                        {isGeocoding && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

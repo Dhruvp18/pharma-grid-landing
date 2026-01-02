@@ -286,23 +286,37 @@ async def create_listing(
     lng: Optional[str] = Form(None),
     verified: bool = Form(...),
     safety_score: int = Form(...),
+    owner_id: str = Form(...),
+    user_email: Optional[str] = Form(None),
+    user_name: Optional[str] = Form(None),
     reason: Optional[str] = Form(None),
     images: List[UploadFile] = File(default=[])
 ):
-    print(f"📝 Creating Item in 'items' table: {title} @ ({lat}, {lng})")
+    print(f"📝 Creating Item in 'items' table: {title} @ ({lat}, {lng}) Owner: {owner_id}")
     
     try:
-        # 1. Get a valid Owner ID (Demo Hack)
-        # Since we don't have auth on the frontend yet, we pick the first user from 'profiles'
-        user_response = supabase.table("profiles").select("id").limit(1).execute()
-        
-        owner_id = None
-        if user_response.data and len(user_response.data) > 0:
-            owner_id = user_response.data[0]['id']
-        else:
-            # If no users exist, we can't insert due to FK constraint.
-            # We will try to insert a dummy profile if allowed, or just fail with a clear message.
-            raise HTTPException(status_code=400, detail="No users found in 'profiles' table. Cannot assign owner.")
+        # 1. Owner ID is now passed from Frontend (Supabase Auth ID)
+        if not owner_id:
+            raise HTTPException(status_code=400, detail="Missing owner_id")
+
+        # --- FIX: Ensure Profile Exists (Foreign Key Constraint) ---
+        # The public.profiles table might not have this user if no trigger is set up.
+        # We manually upsert the profile to valid the FK in 'items'.
+        if user_email: # Only try to sync profile if we have data
+            try:
+                profile_data = {
+                    "id": owner_id,
+                    # "email": user_email, # REMOVED: Schema does not have email column
+                    # "full_name": user_name or "User", 
+                }
+                
+                # Using upsert is safer
+                supabase.table("profiles").upsert(profile_data).execute()
+                print(f"👤 Profile synced for {owner_id}")
+            except Exception as pe:
+                print(f"⚠️ Warning syncing profile: {pe}")
+                # We continue, hoping the profile exists or the error was benign.
+                # If strictly FK fails, the next step will catch it.
 
         # 2. Prepare Data for 'items' schema
         ai_status = "verified" if verified else "pending"

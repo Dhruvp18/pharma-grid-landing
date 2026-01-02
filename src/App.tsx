@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import ListDevice from "./pages/ListDevice";
 import DiscoveryMap from "./pages/DiscoveryMap";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -20,8 +22,11 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/list-device" element={<ListDevice />} />
-            <Route path="/map" element={<DiscoveryMap />} />
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/list-device" element={<ListDevice />} />
+              <Route path="/map" element={<DiscoveryMap />} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

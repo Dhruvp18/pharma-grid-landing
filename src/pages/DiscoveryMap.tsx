@@ -172,9 +172,15 @@ const DiscoveryMap = () => {
 
     const fetchEquipment = async (lat: number, lon: number) => {
         try {
-            const { data, error } = await supabase
-                .from('items')
-                .select('*');
+            let query = supabase.from('items').select('*');
+
+            // Exclude own items if logged in
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+                query = query.neq('owner_id', session.user.id);
+            }
+
+            const { data, error } = await query;
 
             if (error) {
                 console.error('Error fetching equipment:', error);

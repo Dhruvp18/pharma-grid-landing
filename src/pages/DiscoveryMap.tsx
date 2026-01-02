@@ -297,24 +297,56 @@ const DiscoveryMap = () => {
     };
 
     const handleUseMyLocation = () => {
-        if (navigator.geolocation) {
-            toast.info("Getting your location...");
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
+        if (!navigator.geolocation) {
+            toast.error("Geolocation not supported");
+            return;
+        }
+
+        toast.info("Getting precise location…");
+
+        let bestPosition: GeolocationPosition | null = null;
+
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude, accuracy } = position.coords;
+
+                if (accuracy <= 50) {
+                    navigator.geolocation.clearWatch(watchId);
                     updateMapLocation(latitude, longitude);
                     setLocationSearchQuery("Current Location");
-                    toast.success("Updated to your current location");
-                },
-                (error) => {
-                    console.error("Error getting location:", error);
-                    toast.error("Could not get your location.");
+                    toast.success(`Location locked (±${Math.round(accuracy)}m)`);
+                } else {
+                    if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
+                        bestPosition = position;
+                    }
                 }
-            );
-        } else {
-            toast.error("Geolocation is not supported by this browser.");
-        }
+            },
+            () => {
+                toast.error("Unable to get your location");
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 20000
+            }
+        );
+
+        setTimeout(() => {
+            if (bestPosition) {
+                navigator.geolocation.clearWatch(watchId);
+                updateMapLocation(
+                    bestPosition.coords.latitude,
+                    bestPosition.coords.longitude
+                );
+                toast.warning(
+                    `Using approximate location (±${Math.round(
+                        bestPosition.coords.accuracy
+                    )}m)`
+                );
+            }
+        }, 8000);
     };
+
 
     // Initialize Map
     useEffect(() => {
@@ -401,6 +433,11 @@ const DiscoveryMap = () => {
                         console.error("Error getting location:", error);
                         toast.error("Could not get your location. Defaulting to Mumbai.");
                         initializeMap(19.0760, 72.8777);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
                     }
                 );
             } else {
@@ -423,6 +460,10 @@ const DiscoveryMap = () => {
     const flyToLocation = (lat: number, lon: number, id: string) => {
         map.current?.flyTo({ center: [lon, lat], zoom: 16 } as any);
         setSelectedId(id);
+    };
+
+    const handleViewDetails = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
         fetchItemDetails(id);
         setIsDialogOpen(true);
     };
@@ -555,7 +596,7 @@ const DiscoveryMap = () => {
 
             <div className="flex flex-col h-screen md:flex-row">
                 {/* Sidebar / List View */}
-                <div className="w-full md:w-1/3 p-4 overflow-y-auto bg-gray-50 border-r flex flex-col">
+                <div className="w-full md:w-1/3 p-4 overflow-hidden bg-gray-50 border-r flex flex-col">
                     <div className="mb-4 space-y-3">
                         <h1 className="text-2xl font-bold text-primary">Medical Equipment Nearby</h1>
 
@@ -631,6 +672,13 @@ const DiscoveryMap = () => {
                                         <div className="flex items-center justify-between mt-3">
                                             <span className="font-bold text-primary">${item.pricePerDay}/day</span>
                                             <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 px-2 text-xs"
+                                                    onClick={(e) => handleViewDetails(e, item.id)}
+                                                >
+                                                    View Details
+                                                </Button>
                                                 <Button size="sm" variant="outline" className="h-8 w-8 p-0">
                                                     <Navigation className="h-4 w-4" />
                                                 </Button>
@@ -679,7 +727,7 @@ const DiscoveryMap = () => {
                         </div>
                     </DialogHeader>
 
-                    <ScrollArea className="flex-1 p-6">
+                    <div className="flex-1 overflow-y-auto p-6">
                         {isLoadingDetails ? (
                             <div className="flex items-center justify-center h-48">
                                 <span className="loading-spinner">Loading details...</span>
@@ -769,7 +817,7 @@ const DiscoveryMap = () => {
                                 Item not found.
                             </div>
                         )}
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
         </>

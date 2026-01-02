@@ -22,7 +22,7 @@ const DiscoveryMap = () => {
     const [locationSearchQuery, setLocationSearchQuery] = useState("");
 
     // REPLACE WITH YOUR ACTUAL API KEY
-    maptilersdk.config.apiKey = '2emv9KcGYsrDGXqCzf6k';
+    maptilersdk.config.apiKey = import.meta.env.VITE_MAPTILER_API_KEY;
 
     // Update markers when filtered equipment changes
     useEffect(() => {

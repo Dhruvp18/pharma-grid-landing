@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingModal from "./components/OnboardingModal";
+import Bookings from "./pages/Bookings";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route path="/list-device" element={<ListDevice />} />
               <Route path="/map" element={<DiscoveryMap />} />
+              <Route path="/bookings" element={<Bookings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

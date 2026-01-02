@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { BookingModal } from "@/components/BookingModal";
 
 
 const DiscoveryMap = () => {
@@ -805,9 +806,7 @@ const DiscoveryMap = () => {
                                                 </div>
                                             )}
 
-                                            <Button className="w-full mt-6" size="lg">
-                                                Request Booking
-                                            </Button>
+                                            <BookingModal item={selectedDetailedItem} />
                                         </div>
                                     </div>
                                 </div>

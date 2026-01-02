@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import base64
 
 # --- CONFIGURATION ---
@@ -31,6 +32,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+safety_config = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
+
 # API Keys
 GEMINI_API_KEY = os.getenv("VITE_GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -50,7 +58,7 @@ else:
 
 supabase: Client = create_client(SUPABASE_URL, supabase_key)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-flash-latest')
+model = genai.GenerativeModel('gemini-flash-latest', safety_settings=safety_config)
 
 # --- HELPER: Call Gemini API ---
 # We use a helper to keep the endpoints clean, mimicking the Node structure

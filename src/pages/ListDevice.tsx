@@ -15,9 +15,8 @@ import {
     Locate,
 } from "lucide-react";
 
-import * as maptilersdk from '@maptiler/sdk';
-import "@maptiler/sdk/dist/maptiler-sdk.css";
-maptilersdk.config.apiKey = '2emv9KcGYsrDGXqCzf6k'; // Reusing key from DiscoveryMap
+import * as tt from '@tomtom-international/web-sdk-maps';
+import '@tomtom-international/web-sdk-maps/dist/maps.css';
 
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -361,26 +360,40 @@ const ListDevice = () => {
 
     // Map State
     const mapContainer = useRef<HTMLDivElement>(null);
-    const map = useRef<maptilersdk.Map | null>(null);
-    const marker = useRef<maptilersdk.Marker | null>(null);
+    const map = useRef<tt.Map | null>(null);
+    const marker = useRef<tt.Marker | null>(null);
     const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
 
     // Initialize Map on Step 3
     useEffect(() => {
-        if (step === 3 && mapContainer.current && !map.current) {
+        if (step === 3 && mapContainer.current && !map.current && TOMTOM_API_KEY) {
             const mumbai = { lat: 19.0760, lng: 72.8777 };
 
-            map.current = new maptilersdk.Map({
+            map.current = tt.map({
+                key: TOMTOM_API_KEY,
                 container: mapContainer.current,
-                style: maptilersdk.MapStyle.STREETS,
+                style: 'https://api.tomtom.com/map/1/style/22.2.1-9/basic_main.json',
                 center: [mumbai.lng, mumbai.lat],
                 zoom: 12,
+                dragPan: true,
+                dragRotate: true,
             });
 
+            map.current.addControl(new tt.NavigationControl(), 'top-right');
+
             // Initial Marker
-            marker.current = new maptilersdk.Marker({
+            const markerElement = document.createElement('div');
+            markerElement.className = 'marker-icon';
+            markerElement.style.backgroundImage = 'url(https://api.tomtom.com/maps-sdk-for-web/cdn/static/s/images/marker-icon.png)';
+            markerElement.style.width = '30px';
+            markerElement.style.height = '30px';
+            markerElement.style.backgroundSize = 'cover';
+            markerElement.style.cursor = 'grab';
+
+            marker.current = new tt.Marker({
                 draggable: true,
-                color: "#0F766E" // Primary Teal
+                element: markerElement
             })
                 .setLngLat([mumbai.lng, mumbai.lat])
                 .addTo(map.current);
@@ -397,7 +410,7 @@ const ListDevice = () => {
                 }
             });
         }
-    }, [step]);
+    }, [step, TOMTOM_API_KEY]);
 
 
     const renderStep3 = () => (

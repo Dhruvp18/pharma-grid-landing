@@ -9,6 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, Phone, Locate, Search, Clock } from 'lucide-react';
 import { toast } from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+
 
 const DiscoveryMap = () => {
     const mapContainer = useRef<HTMLDivElement>(null);
@@ -24,6 +36,13 @@ const DiscoveryMap = () => {
     const [locationSearchQuery, setLocationSearchQuery] = useState("");
     // Store ETAs for all items: itemId -> etaString
     const [etas, setEtas] = useState<Record<string, string>>({});
+
+    // Detail Card State
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [selectedDetailedItem, setSelectedDetailedItem] = useState<any>(null);
+    const [startImages, setItemImages] = useState<string[]>([]);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
 
     const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
 
@@ -404,7 +423,59 @@ const DiscoveryMap = () => {
     const flyToLocation = (lat: number, lon: number, id: string) => {
         map.current?.flyTo({ center: [lon, lat], zoom: 16 } as any);
         setSelectedId(id);
+        fetchItemDetails(id);
+        setIsDialogOpen(true);
     };
+
+    const fetchItemDetails = async (id: string) => {
+        setIsLoadingDetails(true);
+        setSelectedDetailedItem(null);
+        setItemImages([]);
+
+        try {
+            // 1. Fetch Item Details
+            const { data: itemData, error: itemError } = await supabase
+                .from('items')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (itemError) throw itemError;
+            setSelectedDetailedItem(itemData);
+
+            // 2. Fetch Images from Storage
+            // List files in device-images/{id}/
+            const { data: files, error: storageError } = await supabase
+                .storage
+                .from('device-images')
+                .list(id);
+
+            if (storageError) {
+                console.error("Storage list error:", storageError);
+                // Fallback: use item.image_url if available
+                if (itemData.image_url) {
+                    setItemImages([itemData.image_url]);
+                }
+            } else if (files && files.length > 0) {
+                const urls = files.map(file => {
+                    return supabase.storage.from('device-images').getPublicUrl(`${id}/${file.name}`).data.publicUrl;
+                });
+                setItemImages(urls);
+            } else {
+                // No files in folder, check single image_url
+                if (itemData.image_url) {
+                    setItemImages([itemData.image_url]);
+                }
+            }
+
+        } catch (error) {
+            console.error("Error fetching details:", error);
+            toast.error("Failed to load item details.");
+        } finally {
+            setIsLoadingDetails(false);
+        }
+    };
+
 
     // Draw Route for Selected Item
     useEffect(() => {
@@ -480,113 +551,230 @@ const DiscoveryMap = () => {
     }, [selectedId, userLocation, equipment]); // Re-draw if selection or location changes
 
     return (
-        <div className="flex flex-col h-screen md:flex-row">
-            {/* Sidebar / List View */}
-            <div className="w-full md:w-1/3 p-4 overflow-y-auto bg-gray-50 border-r flex flex-col">
-                <div className="mb-4 space-y-3">
-                    <h1 className="text-2xl font-bold text-primary">Medical Equipment Nearby</h1>
+        <>
 
-                    {/* Search Input */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search equipment, hospital..."
-                            className="w-full pl-9 p-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
+            <div className="flex flex-col h-screen md:flex-row">
+                {/* Sidebar / List View */}
+                <div className="w-full md:w-1/3 p-4 overflow-y-auto bg-gray-50 border-r flex flex-col">
+                    <div className="mb-4 space-y-3">
+                        <h1 className="text-2xl font-bold text-primary">Medical Equipment Nearby</h1>
 
-                    {/* Location Input */}
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        {/* Search Input */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Enter location..."
+                                placeholder="Search equipment, hospital..."
                                 className="w-full pl-9 p-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                value={locationSearchQuery}
-                                onChange={(e) => setLocationSearchQuery(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleUseMyLocation}
-                            title="Use my location"
-                        >
-                            <Locate className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={handleLocationSearch}>
-                            Go
-                        </Button>
+
+                        {/* Location Input */}
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Enter location..."
+                                    className="w-full pl-9 p-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                    value={locationSearchQuery}
+                                    onChange={(e) => setLocationSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
+                                />
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={handleUseMyLocation}
+                                title="Use my location"
+                            >
+                                <Locate className="h-4 w-4" />
+                            </Button>
+                            <Button onClick={handleLocationSearch}>
+                                Go
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 flex-1 overflow-y-auto">
+                        {filteredEquipment.length === 0 ? (
+                            <p className="text-center text-gray-500 mt-4">No equipment found matching your search.</p>
+                        ) : (
+                            filteredEquipment.map((item) => (
+                                <Card
+                                    key={item.id}
+                                    className={`cursor-pointer transition-all hover:shadow-md ${selectedId === item.id ? 'border-primary ring-1 ring-primary' : ''}`}
+                                    onClick={() => flyToLocation(item.lat, item.lon, item.id)}
+                                >
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-lg flex justify-between items-start">
+                                            <span>{item.name}</span>
+                                            <span className={`text-xs px-2 py-1 rounded-full ${item.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                {item.available ? 'Available' : 'Busy'}
+                                            </span>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm text-gray-600 font-medium">{item.hospitalName}</p>
+                                        <p className="text-xs text-gray-500 mb-2">{item.address}</p>
+
+                                        {/* ETA Display for ALL Items */}
+                                        <div className="flex items-center gap-2 text-sm text-blue-600 my-2 bg-blue-50 p-2 rounded">
+                                            <Clock className="h-4 w-4" />
+                                            <span className="font-medium">
+                                                {etas[item.id] ? `Est. Travel: ${etas[item.id]}` : "Calculating ETA..."}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center justify-between mt-3">
+                                            <span className="font-bold text-primary">${item.pricePerDay}/day</span>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                                                    <Navigation className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="sm" className="h-8 w-8 p-0">
+                                                    <Phone className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
                     </div>
                 </div>
 
-                <div className="space-y-4 flex-1 overflow-y-auto">
-                    {filteredEquipment.length === 0 ? (
-                        <p className="text-center text-gray-500 mt-4">No equipment found matching your search.</p>
-                    ) : (
-                        filteredEquipment.map((item) => (
-                            <Card
-                                key={item.id}
-                                className={`cursor-pointer transition-all hover:shadow-md ${selectedId === item.id ? 'border-primary ring-1 ring-primary' : ''}`}
-                                onClick={() => flyToLocation(item.lat, item.lon, item.id)}
-                            >
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-lg flex justify-between items-start">
-                                        <span>{item.name}</span>
-                                        <span className={`text-xs px-2 py-1 rounded-full ${item.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                            {item.available ? 'Available' : 'Busy'}
-                                        </span>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-gray-600 font-medium">{item.hospitalName}</p>
-                                    <p className="text-xs text-gray-500 mb-2">{item.address}</p>
-
-                                    {/* ETA Display for ALL Items */}
-                                    <div className="flex items-center gap-2 text-sm text-blue-600 my-2 bg-blue-50 p-2 rounded">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="font-medium">
-                                            {etas[item.id] ? `Est. Travel: ${etas[item.id]}` : "Calculating ETA..."}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between mt-3">
-                                        <span className="font-bold text-primary">${item.pricePerDay}/day</span>
-                                        <div className="flex gap-2">
-                                            <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                                <Navigation className="h-4 w-4" />
-                                            </Button>
-                                            <Button size="sm" className="h-8 w-8 p-0">
-                                                <Phone className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
+                {/* Map Container */}
+                <div className="w-full md:w-2/3 h-[50vh] md:h-full relative">
+                    <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+                    {!userLocation && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 z-10">
+                            <div className="bg-white p-4 rounded-lg shadow-lg flex items-center gap-2">
+                                <MapPin className="animate-bounce text-primary" />
+                                <span>Locating you...</span>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* Map Container */}
-            <div className="w-full md:w-2/3 h-[50vh] md:h-full relative">
-                <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
-                {!userLocation && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 z-10">
-                        <div className="bg-white p-4 rounded-lg shadow-lg flex items-center gap-2">
-                            <MapPin className="animate-bounce text-primary" />
-                            <span>Locating you...</span>
+            {/* Detail Dialog */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+                    <DialogHeader className="p-6 border-b">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <DialogTitle className="text-2xl font-bold">{selectedDetailedItem?.title || "Loading..."}</DialogTitle>
+                                <DialogDescription className="text-base mt-2">
+                                    {selectedDetailedItem?.category} • {selectedDetailedItem?.address_text}
+                                </DialogDescription>
+                            </div>
+                            {selectedDetailedItem && (
+                                <Badge variant={selectedDetailedItem.is_available ? "default" : "destructive"}>
+                                    {selectedDetailedItem.is_available ? "Available" : "Checked Out"}
+                                </Badge>
+                            )}
                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
+                    </DialogHeader>
+
+                    <ScrollArea className="flex-1 p-6">
+                        {isLoadingDetails ? (
+                            <div className="flex items-center justify-center h-48">
+                                <span className="loading-spinner">Loading details...</span>
+                            </div>
+                        ) : selectedDetailedItem ? (
+                            <div className="space-y-6">
+                                {/* Image Gallery */}
+                                {startImages.length > 0 && (
+                                    <div className="w-full flex justify-center bg-black/5 rounded-lg py-4">
+                                        <Carousel className="w-full max-w-lg">
+                                            <CarouselContent>
+                                                {startImages.map((img, index) => (
+                                                    <CarouselItem key={index}>
+                                                        <div className="p-1">
+                                                            <div className="overflow-hidden rounded-xl aspect-video border bg-white flex items-center justify-center">
+                                                                <img
+                                                                    src={img}
+                                                                    alt={`Item Image ${index + 1}`}
+                                                                    className="w-full h-full object-contain"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </CarouselItem>
+                                                ))}
+                                            </CarouselContent>
+                                            <CarouselPrevious />
+                                            <CarouselNext />
+                                        </Carousel>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="font-semibold text-lg text-primary mb-2">Description</h3>
+                                            <p className="text-gray-600 whitespace-pre-line">{selectedDetailedItem.description || "No description provided."}</p>
+                                        </div>
+
+                                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                            <h4 className="font-semibold text-blue-900 mb-2">Verification Status</h4>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Badge variant="outline" className="bg-white">
+                                                    Status: {selectedDetailedItem.ai_status}
+                                                </Badge>
+                                                {selectedDetailedItem.ai_status === 'verified' && (
+                                                    <span className="text-green-600 text-sm font-medium">Verified Safe</span>
+                                                )}
+                                            </div>
+                                            {selectedDetailedItem.ai_reason && (
+                                                <p className="text-sm text-blue-800 mt-2">
+                                                    {selectedDetailedItem.ai_reason}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="p-4 border rounded-xl shadow-sm">
+                                            <h3 className="text-lg font-bold mb-4">Rental Details</h3>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-muted-foreground">Price per Day</span>
+                                                <span className="text-xl font-bold text-primary">₹{selectedDetailedItem.price_per_day}</span>
+                                            </div>
+                                            <Separator className="my-3" />
+                                            {selectedDetailedItem.owner_id && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Phone className="w-4 h-4 text-muted-foreground" />
+                                                        <span>{selectedDetailedItem.contact_phone || "Contact hidden"}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                                                        <span className="text-sm text-muted-foreground">{selectedDetailedItem.address_text}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <Button className="w-full mt-6" size="lg">
+                                                Request Booking
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center text-muted-foreground p-10">
+                                Item not found.
+                            </div>
+                        )}
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 };
+
 
 export default DiscoveryMap;

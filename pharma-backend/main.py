@@ -35,12 +35,20 @@ app.add_middleware(
 GEMINI_API_KEY = os.getenv("VITE_GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("VITE_SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 if not GEMINI_API_KEY or not SUPABASE_URL or not SUPABASE_ANON_KEY:
     print("WARNING: Missing API Keys in .env")
 
 # Initialize Clients
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+# Use Service Role Key for backend administration (Bypasses RLS) if available
+supabase_key = SUPABASE_SERVICE_ROLE_KEY if SUPABASE_SERVICE_ROLE_KEY else SUPABASE_ANON_KEY
+if not SUPABASE_SERVICE_ROLE_KEY:
+    print("⚠️ WARNING: Using Anon Key. Functionality like Storage Uploads may fail due to RLS.")
+else:
+    print("🔐 Using Service Role Key (Admin Access)")
+
+supabase: Client = create_client(SUPABASE_URL, supabase_key)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-flash-latest')
 
@@ -357,8 +365,49 @@ async def create_listing(
         if not response.data:
              raise HTTPException(status_code=500, detail="Failed to create item in Database")
 
-        print(f"✅ Item Created ID: {response.data[0].get('id')}")
-        return {"success": True, "item": response.data[0]}
+        new_item = response.data[0]
+        new_item_id = new_item.get('id')
+        print(f"✅ DB Item Created: {new_item_id}")
+
+        # 4. Upload Images to Supabase Storage (device-images bucket)
+        uploaded_image_url = None
+        
+        if images:
+            print(f"📤 Uploading {len(images)} images for item {new_item_id}...")
+            try:
+                for idx, file in enumerate(images):
+                    # Reset file cursor just in case it was read before
+                    await file.seek(0)
+                    file_content = await file.read()
+                    
+                    # Naming: {item_id}/{original_filename}
+                    # We might want to sanitize filename or use UUID, but User said "folder name would be the id"
+                    file_path = f"{new_item_id}/{file.filename}"
+                    
+                    # Upload to Supabase Storage
+                    # Note: Ensure 'device-images' bucket is public or policies allow access
+                    storage_res = supabase.storage.from_("device-images").upload(
+                        path=file_path,
+                        file=file_content,
+                        file_options={"content-type": file.content_type}
+                    )
+                    
+                    # Get Public URL for the first image to display on frontend
+                    if idx == 0:
+                        uploaded_image_url = supabase.storage.from_("device-images").get_public_url(file_path)
+            
+            except Exception as storage_err:
+                print(f"⚠️ Storage Upload Error: {storage_err}")
+                # We proceed without failing the whole request, as the item is already in DB.
+        
+        # 5. Update 'image_url' if we successfully uploaded
+        if uploaded_image_url:
+            print(f"🖼️ Updating Item Image URL: {uploaded_image_url}")
+            supabase.table("items").update({"image_url": uploaded_image_url}).eq("id", new_item_id).execute()
+            new_item['image_url'] = uploaded_image_url
+
+        print(f"✅ Listing Complete ID: {new_item_id}")
+        return {"success": True, "item": new_item}
 
     except Exception as e:
         print(f"❌ Error creating item: {e}")

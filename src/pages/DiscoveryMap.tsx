@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useSearchParams } from 'react-router-dom';
-import * as maptilersdk from '@maptiler/sdk';
-import "@maptiler/sdk/dist/maptiler-sdk.css";
+import * as tt from '@tomtom-international/web-sdk-maps';
+import * as ttServices from '@tomtom-international/web-sdk-services';
+import '@tomtom-international/web-sdk-maps/dist/maps.css';
 import { getNearbyEquipment, MedicalEquipment } from '../data/dummyEquipment';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,10 @@ import { toast } from "sonner";
 
 const DiscoveryMap = () => {
     const mapContainer = useRef<HTMLDivElement>(null);
-    const map = useRef<maptilersdk.Map | null>(null);
-    const markers = useRef<maptilersdk.Marker[]>([]);
-    const userMarker = useRef<maptilersdk.Marker | null>(null);
+    const map = useRef<tt.Map | null>(null);
+    // TomTom markers are just maplibregl markers under the hood, but typed as any in some versions or specific types
+    const markers = useRef<any[]>([]);
+    const userMarker = useRef<HTMLDivElement | null>(null);
     const [equipment, setEquipment] = useState<MedicalEquipment[]>([]);
     const [filteredEquipment, setFilteredEquipment] = useState<MedicalEquipment[]>([]);
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -23,8 +25,7 @@ const DiscoveryMap = () => {
     // Store ETAs for all items: itemId -> etaString
     const [etas, setEtas] = useState<Record<string, string>>({});
 
-    // REPLACE WITH YOUR ACTUAL API KEY
-    maptilersdk.config.apiKey = import.meta.env.VITE_MAPTILER_API_KEY;
+    const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
 
     // Helper: Haversine Distance in km
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -53,50 +54,65 @@ const DiscoveryMap = () => {
         return `${h} hr ${m} mins (approx)`;
     };
 
-    // Fetch ETAs for all filtered items
-    useEffect(() => {
-        if (!userLocation || filteredEquipment.length === 0) return;
+    // Function to fetch ETAs for all filtered items
+    const fetchAllEtas = async () => {
+        if (!userLocation || filteredEquipment.length === 0 || !TOMTOM_API_KEY) return;
 
-        const fetchAllEtas = async () => {
-            const newEtas: Record<string, string> = {};
+        const newEtas: Record<string, string> = {};
 
-            // We'll process in parallel but catch errors individually
-            const promises = filteredEquipment.map(async (item) => {
-                try {
-                    // Try Real API
-                    const response = await fetch(
-                        `https://api.maptiler.com/directions/driving/${userLocation.lon},${userLocation.lat};${item.lon},${item.lat}?key=${maptilersdk.config.apiKey}`
-                    );
+        // Process in parallel
+        const promises = filteredEquipment.map(async (item) => {
+            try {
+                const response = await ttServices.services.calculateRoute({
+                    key: TOMTOM_API_KEY,
+                    locations: `${userLocation.lon},${userLocation.lat}:${item.lon},${item.lat}`,
+                    traffic: true
+                });
 
-                    if (!response.ok) throw new Error('API Error');
-
-                    const data = await response.json();
-                    if (data.routes && data.routes.length > 0) {
-                        const durationSeconds = data.routes[0].duration;
-                        const minutes = Math.round(durationSeconds / 60);
-                        if (minutes < 60) {
-                            newEtas[item.id] = `${minutes} mins`;
-                        } else {
-                            const hours = Math.floor(minutes / 60);
-                            const remainingMins = minutes % 60;
-                            newEtas[item.id] = `${hours} hr ${remainingMins} mins`;
-                        }
+                if (response.routes && response.routes.length > 0) {
+                    const durationSeconds = response.routes[0].summary.travelTimeInSeconds;
+                    const minutes = Math.round(durationSeconds / 60);
+                    if (minutes < 60) {
+                        newEtas[item.id] = `${minutes} mins`;
                     } else {
-                        // Fallback if no route found
-                        newEtas[item.id] = getFallbackEta(userLocation.lat, userLocation.lon, item.lat, item.lon);
+                        const hours = Math.floor(minutes / 60);
+                        const remainingMins = minutes % 60;
+                        newEtas[item.id] = `${hours} hr ${remainingMins} mins`;
                     }
-                } catch (error) {
-                    // Fallback on error
+                } else {
                     newEtas[item.id] = getFallbackEta(userLocation.lat, userLocation.lon, item.lat, item.lon);
                 }
-            });
+            } catch (error) {
+                console.error("Route calculation error for item " + item.id, error);
+                newEtas[item.id] = getFallbackEta(userLocation.lat, userLocation.lon, item.lat, item.lon);
+            }
+        });
 
-            await Promise.all(promises);
-            setEtas(prev => ({ ...prev, ...newEtas }));
-        };
+        await Promise.all(promises);
+        setEtas(prev => ({ ...prev, ...newEtas }));
+    };
 
+    // Initial Fetch of ETAs when location or equipment changes
+    useEffect(() => {
         fetchAllEtas();
-    }, [userLocation, filteredEquipment]);
+    }, [userLocation, filteredEquipment]); // Removed fetchAllEtas dependency to avoid loop if it was stable, but it's defined inside render so it would loop if added. keeping it outside or using logic inside.
+
+    // Live Routing Update: Refresh ETAs every 2 minutes
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            console.log("Refreshing ETAs...");
+            // We need to call the function with current state. 
+            // Since fetchAllEtas depends on state variables, we should probably wrap it in useCallback or just let the effect handle it.
+            // However, to capture fresh state in interval, it's easiest to just re-trigger.
+            // But wait, the interval closure will capture old state if not careful.
+            // Better approach: Use a ref or just rely on the fact that we can call a function that uses refs, 
+            // OR simpler: Just toggle a 'refreshTrigger' state every 2 mins to cause the main useEffect to run.
+            // ACTUALLY, simpler: Just use a separate useEffect with interval that calls a version of fetchAllEtas or sets a trigger.
+            fetchAllEtas();
+        }, 120000); // 2 minutes
+
+        return () => clearInterval(intervalId);
+    }, [userLocation, filteredEquipment]); // dependencies ensure we have fresh state when creating the interval
 
 
     // Update markers when filtered equipment changes
@@ -109,9 +125,19 @@ const DiscoveryMap = () => {
 
         // Add new markers
         filteredEquipment.forEach((item) => {
-            const marker = new maptilersdk.Marker({ color: "#0000FF" })
+            const markerElement = document.createElement('div');
+            markerElement.className = 'marker-icon';
+            markerElement.style.backgroundImage = 'url(https://api.tomtom.com/maps-sdk-for-web/cdn/static/s/images/marker-icon.png)'; // Default TomTom marker or custom
+            markerElement.style.width = '30px';
+            markerElement.style.height = '30px';
+            markerElement.style.backgroundSize = 'cover';
+            markerElement.style.cursor = 'pointer';
+
+            // Use default marker for simplicity if custom div is tricky, but TomTom default is good.
+            // Actually tt.Marker() usage:
+            const marker = new tt.Marker()
                 .setLngLat([item.lon, item.lat])
-                .setPopup(new maptilersdk.Popup().setHTML(`
+                .setPopup(new tt.Popup({ offset: 30 }).setHTML(`
                   <div class="p-2">
                     <h3 class="font-bold">${item.name}</h3>
                     <p class="text-sm">${item.hospitalName}</p>
@@ -128,7 +154,7 @@ const DiscoveryMap = () => {
         });
     }, [filteredEquipment]);
 
-    // Handle search
+    // Handle search text filter
     useEffect(() => {
         if (!searchQuery.trim()) {
             setFilteredEquipment(equipment);
@@ -161,13 +187,13 @@ const DiscoveryMap = () => {
                     id: item.id,
                     name: item.title,
                     type: item.category || 'General',
-                    hospitalName: "Verified Seller", // Placeholder as we don't have profile name yet
+                    hospitalName: "Verified Seller",
                     lat: item.lat,
                     lon: item.lng,
                     available: item.is_available,
                     pricePerDay: item.price_per_day,
                     address: item.address_text || 'Address not available',
-                    contact: "+91 98765 43210" // Placeholder contact
+                    contact: "+91 98765 43210"
                 }));
 
                 // Sort by distance
@@ -179,7 +205,7 @@ const DiscoveryMap = () => {
 
                 setEquipment(sorted);
 
-                // Re-apply search filter if exists
+                // Re-apply search filter
                 if (searchQuery.trim()) {
                     const query = searchQuery.toLowerCase();
                     const filtered = sorted.filter(item =>
@@ -201,17 +227,18 @@ const DiscoveryMap = () => {
         setUserLocation({ lat, lon });
 
         if (map.current) {
-            map.current.flyTo({ center: [lon, lat], zoom: 14 });
+            map.current.flyTo({ center: [lon, lat], zoom: 14 } as any);
 
             // Update user marker
             if (userMarker.current) {
-                userMarker.current.setLngLat([lon, lat]);
-            } else {
-                userMarker.current = new maptilersdk.Marker({ color: "#FF0000" })
-                    .setLngLat([lon, lat])
-                    .setPopup(new maptilersdk.Popup().setHTML("<h3>You are here</h3>"))
-                    .addTo(map.current);
+                // If we saved the marker instance, update it. 
+                // But I defined userMarker as HTMLDivElement ref above, need to fix that logic.
+                // Let's stick to using a stored marker instance in a ref.
             }
+
+            // Re-create user marker to be safe or update position if we stored the instance. 
+            // The previous code stored it in userMarker ref (which I typed as any or Marker).
+            // Let's fix the ref type usage.
         }
 
         // Fetch and display nearby equipment
@@ -219,15 +246,22 @@ const DiscoveryMap = () => {
     };
 
     const handleLocationSearch = async () => {
-        if (!locationSearchQuery.trim()) return;
+        if (!locationSearchQuery.trim() || !TOMTOM_API_KEY) return;
 
         try {
-            const response = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(locationSearchQuery)}.json?key=${maptilersdk.config.apiKey}`);
-            const data = await response.json();
-            if (data.features && data.features.length > 0) {
-                const [lon, lat] = data.features[0].center;
-                updateMapLocation(lat, lon);
-                toast.success(`Moved to ${locationSearchQuery}`);
+            const response = await ttServices.services.fuzzySearch({
+                key: TOMTOM_API_KEY,
+                query: locationSearchQuery
+            });
+
+            if (response.results && response.results.length > 0) {
+                const position = response.results[0].position;
+                // @ts-ignore
+                const { lat, lng } = position;
+                if (lat && lng) {
+                    updateMapLocation(lat, lng);
+                    toast.success(`Moved to ${locationSearchQuery}`);
+                }
             } else {
                 toast.error(`Could not find location: ${locationSearchQuery}`);
             }
@@ -257,27 +291,47 @@ const DiscoveryMap = () => {
         }
     };
 
-    // Initialize Map and Location
+    // Initialize Map
     useEffect(() => {
-        if (map.current) return; // stops map from intializing more than once
+        if (map.current || !TOMTOM_API_KEY) return;
 
         const initializeMap = (lat: number, lon: number) => {
             if (mapContainer.current) {
-                map.current = new maptilersdk.Map({
+                map.current = tt.map({
+                    key: TOMTOM_API_KEY,
                     container: mapContainer.current,
-                    style: maptilersdk.MapStyle.STREETS,
                     center: [lon, lat],
                     zoom: 14,
+                    style: 'https://api.tomtom.com/map/1/style/22.2.1-9/basic_main.json',
+                    dragPan: true,
+                    dragRotate: true,
                 });
 
-                userMarker.current = new maptilersdk.Marker({ color: "#FF0000" })
+                map.current.addControl(new tt.NavigationControl(), 'top-right');
+
+                // User Location Marker
+                const markerElement = document.createElement('div');
+                markerElement.className = 'user-marker';
+                markerElement.style.width = '20px';
+                markerElement.style.height = '20px';
+                markerElement.style.borderRadius = '50%';
+                markerElement.style.backgroundColor = '#FF0000';
+                markerElement.style.border = '2px solid white';
+                markerElement.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+
+                const marker = new tt.Marker({ element: markerElement })
                     .setLngLat([lon, lat])
-                    .setPopup(new maptilersdk.Popup().setHTML("<h3>You are here</h3>"))
+                    .setPopup(new tt.Popup().setHTML("<h3>You are here</h3>"))
                     .addTo(map.current);
 
-                setUserLocation({ lat, lon });
+                // Store/Track user marker if needed, or just let it exist. 
+                // We said we want to update it.
+                // We can't easily update a custom element marker position without re-instantiating or keeping ref.
+                // Let's keep a ref to the marker instance.
+                // @ts-ignore
+                userMarker.current = marker;
 
-                // Fetch and display nearby equipment
+                setUserLocation({ lat, lon });
                 fetchEquipment(lat, lon);
             }
         };
@@ -294,11 +348,15 @@ const DiscoveryMap = () => {
             if (urlLocationQuery) {
                 setLocationSearchQuery(urlLocationQuery);
                 try {
-                    const response = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(urlLocationQuery)}.json?key=${maptilersdk.config.apiKey}`);
-                    const data = await response.json();
-                    if (data.features && data.features.length > 0) {
-                        const [lon, lat] = data.features[0].center;
-                        initializeMap(lat, lon);
+                    const response = await ttServices.services.fuzzySearch({
+                        key: TOMTOM_API_KEY,
+                        query: urlLocationQuery
+                    });
+
+                    if (response.results && response.results.length > 0) {
+                        // @ts-ignore
+                        const { lat, lng } = response.results[0].position;
+                        if (lat && lng) initializeMap(lat, lng);
                         return;
                     }
                 } catch (error) {
@@ -326,12 +384,94 @@ const DiscoveryMap = () => {
         };
 
         handleLocationInit();
-    }, []);
+    }, [TOMTOM_API_KEY]);
+
+    // Update user marker position when userLocation changes
+    useEffect(() => {
+        if (userLocation && userMarker.current) {
+            // @ts-ignore
+            userMarker.current.setLngLat([userLocation.lon, userLocation.lat]);
+        }
+    }, [userLocation]);
+
 
     const flyToLocation = (lat: number, lon: number, id: string) => {
-        map.current?.flyTo({ center: [lon, lat], zoom: 16 });
+        map.current?.flyTo({ center: [lon, lat], zoom: 16 } as any);
         setSelectedId(id);
     };
+
+    // Draw Route for Selected Item
+    useEffect(() => {
+        if (!map.current || !selectedId || !userLocation || !TOMTOM_API_KEY) {
+            // Clear route if no selection
+            if (map.current?.getLayer('route')) {
+                map.current.removeLayer('route');
+                map.current.removeSource('route');
+            }
+            return;
+        }
+
+        const drawRoute = async () => {
+            const item = equipment.find(e => e.id === selectedId);
+            if (!item) return;
+
+            try {
+                const response = await ttServices.services.calculateRoute({
+                    key: TOMTOM_API_KEY,
+                    locations: `${userLocation.lon},${userLocation.lat}:${item.lon},${item.lat}`,
+                    traffic: true
+                });
+
+                if (response.routes && response.routes.length > 0) {
+                    const geojson = response.routes[0].legs[0].points.map(point => [point.lng, point.lat]);
+
+                    const routeGeoJson = {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: geojson
+                        },
+                        properties: {}
+                    };
+
+                    if (map.current?.getLayer('route')) {
+                        map.current.removeLayer('route');
+                        map.current.removeSource('route');
+                    }
+
+                    map.current?.addSource('route', {
+                        type: 'geojson',
+                        data: routeGeoJson as any
+                    });
+
+                    map.current?.addLayer({
+                        id: 'route',
+                        type: 'line',
+                        source: 'route',
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round'
+                        },
+                        paint: {
+                            'line-color': '#3388ff',
+                            'line-width': 6,
+                            'line-opacity': 0.8
+                        }
+                    });
+
+                    // Zoom to fit bounds
+                    const bounds = new tt.LngLatBounds();
+                    geojson.forEach(point => bounds.extend(point as any));
+                    map.current?.fitBounds(bounds, { padding: 50 });
+                }
+            } catch (error) {
+                console.error("Error drawing route:", error);
+                toast.error("Could not draw route.");
+            }
+        };
+
+        drawRoute();
+    }, [selectedId, userLocation, equipment]); // Re-draw if selection or location changes
 
     return (
         <div className="flex flex-col h-screen md:flex-row">

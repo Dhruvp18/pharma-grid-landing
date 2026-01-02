@@ -11,7 +11,9 @@ import google.generativeai as genai
 import base64
 
 # --- CONFIGURATION ---
-load_dotenv()
+from pathlib import Path
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 app = FastAPI()
 
@@ -30,9 +32,9 @@ app.add_middleware(
 )
 
 # API Keys
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+GEMINI_API_KEY = os.getenv("VITE_GEMINI_API_KEY")
+SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("VITE_SUPABASE_ANON_KEY")
 
 if not GEMINI_API_KEY or not SUPABASE_URL or not SUPABASE_ANON_KEY:
     print("WARNING: Missing API Keys in .env")

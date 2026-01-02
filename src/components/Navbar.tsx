@@ -40,9 +40,11 @@ const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="outline" size="default">
-              List Your Device
-            </Button>
+            <a href="/list-device">
+              <Button variant="outline" size="default">
+                List Your Device
+              </Button>
+            </a>
             <Button variant="default" size="default">
               Login
             </Button>
@@ -72,9 +74,11 @@ const Navbar = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-3 pt-4">
-                <Button variant="outline" size="default" className="w-full">
-                  List Your Device
-                </Button>
+                <a href="/list-device" className="w-full">
+                  <Button variant="outline" size="default" className="w-full">
+                    List Your Device
+                  </Button>
+                </a>
                 <Button variant="default" size="default" className="w-full">
                   Login
                 </Button>

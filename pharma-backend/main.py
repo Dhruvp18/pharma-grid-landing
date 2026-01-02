@@ -200,6 +200,7 @@ async def analyze_video(video: UploadFile = File(...)):
 # ==========================================
 
 # 1. Generate QR Code (Called by Owner)
+# 1. Generate QR Code (Called by Owner)
 @app.post("/generate-handover")
 async def generate_handover(payload: dict = Body(...)):
     # payload expects {"bookingId": ...}
@@ -214,17 +215,23 @@ async def generate_handover(payload: dict = Body(...)):
         # Save to DB
         response = supabase.table("bookings").update({"handover_code": secret_code}).eq("id", booking_id).execute()
         
-        # Check for error is implicit in python client usually, creates exception on request failure if configured
-        # But supabase-py returns a response object.
-        # If response.data is empty and it should have updated, maybe check that.
-        # But simplistic parity:
+        # --- CRITICAL FIX START ---
+        # Supabase returns the updated rows in response.data. 
+        # If this list is empty, it means the Booking ID does not exist in the DB.
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Booking ID not found")
+        # --- CRITICAL FIX END ---
         
         print(f"🔐 Generated Code for Booking {booking_id}: {secret_code}")
         return {"qrData": secret_code}
 
+    except HTTPException as he:
+        # Allow the 404 or 400 errors to pass through to the client
+        raise he
     except Exception as e:
+        # Catch unexpected server errors
+        print(f"Error generating handover: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
-
 
 # 2. Scan QR Code (Called by Renter)
 @app.post("/scan-handover")

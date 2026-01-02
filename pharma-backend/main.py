@@ -379,6 +379,7 @@ async def create_listing(
 
         # 4. Upload Images to Supabase Storage (device-images bucket)
         uploaded_image_url = None
+        all_image_urls = []
         
         if images:
             print(f"📤 Uploading {len(images)} images for item {new_item_id}...")
@@ -389,30 +390,38 @@ async def create_listing(
                     file_content = await file.read()
                     
                     # Naming: {item_id}/{original_filename}
-                    # We might want to sanitize filename or use UUID, but User said "folder name would be the id"
                     file_path = f"{new_item_id}/{file.filename}"
                     
                     # Upload to Supabase Storage
-                    # Note: Ensure 'device-images' bucket is public or policies allow access
                     storage_res = supabase.storage.from_("device-images").upload(
                         path=file_path,
                         file=file_content,
-                        file_options={"content-type": file.content_type}
+                        file_options={"content-type": file.content_type, "x-upsert": "true"}
                     )
                     
-                    # Get Public URL for the first image to display on frontend
+                    # Get Public URL
+                    public_url_resp = supabase.storage.from_("device-images").get_public_url(file_path)
+                    
+                    # Add to list
+                    all_image_urls.append(public_url_resp)
+
                     if idx == 0:
-                        uploaded_image_url = supabase.storage.from_("device-images").get_public_url(file_path)
+                        uploaded_image_url = public_url_resp
             
             except Exception as storage_err:
                 print(f"⚠️ Storage Upload Error: {storage_err}")
-                # We proceed without failing the whole request, as the item is already in DB.
+                # We proceed without failing
         
-        # 5. Update 'image_url' if we successfully uploaded
+        # 5. Update 'image_url' and 'images' array in DB
         if uploaded_image_url:
-            print(f"🖼️ Updating Item Image URL: {uploaded_image_url}")
-            supabase.table("items").update({"image_url": uploaded_image_url}).eq("id", new_item_id).execute()
+            print(f"🖼️ Updating Item Image URLs...")
+            update_payload = {
+                "image_url": uploaded_image_url,
+                "images": all_image_urls 
+            }
+            supabase.table("items").update(update_payload).eq("id", new_item_id).execute()
             new_item['image_url'] = uploaded_image_url
+            new_item['images'] = all_image_urls
 
         print(f"✅ Listing Complete ID: {new_item_id}")
         return {"success": True, "item": new_item}

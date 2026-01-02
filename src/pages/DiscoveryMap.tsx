@@ -485,28 +485,32 @@ const DiscoveryMap = () => {
             if (itemError) throw itemError;
             setSelectedDetailedItem(itemData);
 
-            // 2. Fetch Images from Storage
-            // List files in device-images/{id}/
-            const { data: files, error: storageError } = await supabase
-                .storage
-                .from('device-images')
-                .list(id);
+            if (itemError) throw itemError;
+            setSelectedDetailedItem(itemData);
 
-            if (storageError) {
-                console.error("Storage list error:", storageError);
-                // Fallback: use item.image_url if available
-                if (itemData.image_url) {
-                    setItemImages([itemData.image_url]);
-                }
-            } else if (files && files.length > 0) {
-                const urls = files.map(file => {
-                    return supabase.storage.from('device-images').getPublicUrl(`${id}/${file.name}`).data.publicUrl;
-                });
-                setItemImages(urls);
+            // 2. Fetch Images
+            // Strategy: Check if 'images' array exists in DB row (Faster/More Reliable)
+            if (itemData.images && Array.isArray(itemData.images) && itemData.images.length > 0) {
+                console.log("Using Database Images Column:", itemData.images);
+                setItemImages(itemData.images);
             } else {
-                // No files in folder, check single image_url
-                if (itemData.image_url) {
-                    setItemImages([itemData.image_url]);
+                // FALLBACK: Try to list from storage (old way)
+                console.warn("Using Storage List fallback for images...");
+                const { data: files, error: storageError } = await supabase
+                    .storage
+                    .from('device-images')
+                    .list(id);
+
+                if (storageError) {
+                    console.error("Storage list error:", storageError);
+                    if (itemData.image_url) setItemImages([itemData.image_url]);
+                } else if (files && files.length > 0) {
+                    const urls = files.map(file => {
+                        return supabase.storage.from('device-images').getPublicUrl(`${id}/${file.name}`).data.publicUrl;
+                    });
+                    setItemImages(urls);
+                } else {
+                    if (itemData.image_url) setItemImages([itemData.image_url]);
                 }
             }
 

@@ -271,6 +271,77 @@ async def scan_handover(payload: dict = Body(...)):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+
+# ==========================================
+#  FEATURE 4: CREATE LISTING (Supabase)
+# ==========================================
+@app.post("/create-listing")
+async def create_listing(
+    title: str = Form(...),
+    category: str = Form(...),
+    description: str = Form(...),
+    price: str = Form(...),
+    location: str = Form(...),
+    lat: Optional[str] = Form(None),
+    lng: Optional[str] = Form(None),
+    verified: bool = Form(...),
+    safety_score: int = Form(...),
+    reason: Optional[str] = Form(None),
+    images: List[UploadFile] = File(default=[])
+):
+    print(f"📝 Creating Item in 'items' table: {title} @ ({lat}, {lng})")
+    
+    try:
+        # 1. Get a valid Owner ID (Demo Hack)
+        # Since we don't have auth on the frontend yet, we pick the first user from 'profiles'
+        user_response = supabase.table("profiles").select("id").limit(1).execute()
+        
+        owner_id = None
+        if user_response.data and len(user_response.data) > 0:
+            owner_id = user_response.data[0]['id']
+        else:
+            # If no users exist, we can't insert due to FK constraint.
+            # We will try to insert a dummy profile if allowed, or just fail with a clear message.
+            raise HTTPException(status_code=400, detail="No users found in 'profiles' table. Cannot assign owner.")
+
+        # 2. Prepare Data for 'items' schema
+        ai_status = "verified" if verified else "pending"
+        ai_full_reason = f"Score: {safety_score}/10. {reason or ''}"
+        
+        # Image Handling: Use a placeholder since we don't have storage buckets set up 
+        # and 'items' expects a single 'image_url' text field.
+        # In a real app, we would upload the file to Supabase Storage and get the URL.
+        final_image_url = "https://images.unsplash.com/photo-1584515933487-779824d29309?w=800&auto=format&fit=crop"
+
+        item_data = {
+            "owner_id": owner_id,
+            "title": title,
+            "category": category,
+            "description": description,
+            "price_per_day": float(price) if price else 0,
+            "address_text": location,
+            "lat": float(lat) if lat else None,
+            "lng": float(lng) if lng else None,
+            "image_url": final_image_url,
+            "ai_status": ai_status,
+            "ai_reason": ai_full_reason,
+            "is_available": True
+        }
+
+        # 3. Insert
+        response = supabase.table("items").insert(item_data).execute()
+        
+        if not response.data:
+             raise HTTPException(status_code=500, detail="Failed to create item in Database")
+
+        print(f"✅ Item Created ID: {response.data[0].get('id')}")
+        return {"success": True, "item": response.data[0]}
+
+    except Exception as e:
+        print(f"❌ Error creating item: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 if __name__ == "__main__":
     import uvicorn
     # Emulate the PORT logic

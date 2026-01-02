@@ -1,7 +1,20 @@
 import { Search, MapPin, ShieldCheck, Clock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+
+  const handleSearch = () => {
+    if (searchQuery || locationQuery) {
+      navigate(`/map?search=${encodeURIComponent(searchQuery)}&location=${encodeURIComponent(locationQuery)}`);
+    } else {
+      navigate('/map');
+    }
+  };
   const trustSignals = [
     { icon: Sparkles, label: "AI Verified" },
     { icon: ShieldCheck, label: "Insured" },
@@ -12,7 +25,7 @@ const HeroSection = () => {
     <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 px-4 overflow-hidden">
       {/* Subtle background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-teal-light/50 via-background to-background pointer-events-none" />
-      
+
       {/* Floating decorative elements */}
       <div className="absolute top-32 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-float" />
       <div className="absolute top-48 right-10 w-48 h-48 bg-coral/10 rounded-full blur-3xl animate-float" style={{ animationDelay: "2s" }} />
@@ -41,6 +54,18 @@ const HeroSection = () => {
 
         {/* Search Component */}
         <div className="max-w-3xl mx-auto mb-10 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+          <div className="flex justify-center mb-4">
+            <Button
+              variant="default"
+              size="lg"
+              className="bg-primary hover:bg-primary/90 text-white rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+              onClick={() => navigate('/map')}
+            >
+              <MapPin className="w-4 h-4 mr-2" />
+              Find Equipments near me
+            </Button>
+          </div>
+
           <div className="glass-card rounded-2xl p-2 md:p-3 shadow-soft-xl">
             <div className="flex flex-col md:flex-row gap-3">
               {/* What do you need */}
@@ -50,6 +75,9 @@ const HeroSection = () => {
                   type="text"
                   placeholder="What do you need?"
                   className="w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
               </div>
 
@@ -63,11 +91,14 @@ const HeroSection = () => {
                   type="text"
                   placeholder="Where are you?"
                   className="w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
+                  value={locationQuery}
+                  onChange={(e) => setLocationQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
               </div>
 
               {/* Search Button */}
-              <Button variant="hero" size="lg" className="md:px-8">
+              <Button variant="hero" size="lg" className="md:px-8" onClick={handleSearch}>
                 <Search className="w-5 h-5" />
                 <span className="hidden sm:inline">Search</span>
               </Button>

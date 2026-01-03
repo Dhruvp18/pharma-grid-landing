@@ -84,6 +84,18 @@ export function BookingModal({ item, trigger, onSuccess }: BookingModalProps) {
                 throw error;
             }
 
+
+            // Update item availability
+            const { error: updateError } = await supabase
+                .from('items')
+                .update({ is_available: false })
+                .eq('id', item.id);
+
+            if (updateError) {
+                console.error("Failed to update item availability:", updateError);
+                toast.error("Booking confirmed, but failed to update item status.");
+            }
+
             toast.success(deliveryMethod === 'delivery' ? "Delivery Requested!" : "Pickup Requested!");
             setIsOpen(false);
             onSuccess?.();

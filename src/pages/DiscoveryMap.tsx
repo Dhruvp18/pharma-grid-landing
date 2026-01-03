@@ -199,7 +199,7 @@ const DiscoveryMap = () => {
 
     const fetchEquipment = async (lat: number, lon: number) => {
         try {
-            let query = supabase.from('items').select('*');
+            let query = supabase.from('items').select('*').eq('is_available', true);
 
             // Exclude own items if logged in
             const { data: { session } } = await supabase.auth.getSession();

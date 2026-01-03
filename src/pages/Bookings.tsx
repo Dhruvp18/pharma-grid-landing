@@ -14,6 +14,7 @@ import { LiveTracking } from "@/components/LiveTracking";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/config";
 import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
+import { ReturnRequestModal } from "@/components/ReturnRequestModal";
 
 interface Booking {
     id: string;
@@ -47,6 +48,12 @@ const Bookings = () => {
     const [viewingItemId, setViewingItemId] = useState<string | null>(null);
     const [reviewingBookingId, setReviewingBookingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Return Flow State
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [returnBookingId, setReturnBookingId] = useState<string | null>(null);
+    const [returnItemId, setReturnItemId] = useState<string | null>(null);
+
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const currentTab = searchParams.get("tab") || "orders";
@@ -317,7 +324,11 @@ const Bookings = () => {
                                     size="sm"
                                     variant="destructive"
                                     className="ml-2"
-                                    onClick={() => handleStatusUpdate(booking.id, 'return_requested')}
+                                    onClick={() => {
+                                        setReturnBookingId(booking.id);
+                                        setReturnItemId(booking.item_id);
+                                        setIsReturnModalOpen(true);
+                                    }}
                                 >
                                     Request Return
                                 </Button>
@@ -537,6 +548,16 @@ const Bookings = () => {
                 itemId={viewingItemId}
                 userBookingIdForReview={reviewingBookingId}
             />
+
+            {returnBookingId && returnItemId && (
+                <ReturnRequestModal
+                    isOpen={isReturnModalOpen}
+                    onClose={() => setIsReturnModalOpen(false)}
+                    bookingId={returnBookingId}
+                    itemId={returnItemId}
+                    onSuccess={handleRefresh}
+                />
+            )}
         </div>
     );
 };

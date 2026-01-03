@@ -181,6 +181,9 @@ async def audit_item(images: List[UploadFile] = File(...)):
 # ==========================================
 #  FEATURE 2: VIDEO AUDITOR (Optional/Bonus)
 # ==========================================
+# ==========================================
+#  FEATURE 2: VIDEO AUDITOR (Optional/Bonus)
+# ==========================================
 @app.post("/analyze-video")
 async def analyze_video(video: UploadFile = File(...)):
     print("🎥 Analyzing Video...")
@@ -213,6 +216,120 @@ async def analyze_video(video: UploadFile = File(...)):
     except Exception as e:
         print("Video Error:", e)
         return JSONResponse(status_code=500, content={"error": "Video Analysis Failed"})
+
+
+# ==========================================
+#  FEATURE 2.5: RETURN ITEM AUDITOR
+# ==========================================
+# ==========================================
+#  FEATURE 2.5: RETURN ITEM AUDITOR
+# ==========================================
+@app.post("/audit-return")
+async def audit_return(
+    item_id: str = Form(...),
+    images: List[UploadFile] = File(...)
+):
+    print(f"🔄 Auditing Return for Item {item_id} with {len(images)} images...")
+
+    import httpx 
+
+    try:
+        # 1. Fetch Original Item Logic
+        item_res = supabase.table("items").select("ai_reason, title, ai_status, images").eq("id", item_id).single().execute()
+        if not item_res.data:
+             return JSONResponse(status_code=404, content={"error": "Item not found"})
+        
+        item = item_res.data
+        original_condition = item.get("ai_reason", "No previous condition record.")
+        item_title = item.get("title", "Unknown Device")
+        original_image_urls = item.get("images") or []
+        
+        # Ensure it's a list (Supabase might return null or empty list)
+        if not isinstance(original_image_urls, list):
+            original_image_urls = []
+
+        # 2. Prepare Images for Gemini
+        # We need to distinguish between ORIGINAL (Reference) and NEW (Return) images.
+        # We will pass them in order: [Original Images..., New Images...]
+        
+        file_parts = []
+        original_count = 0
+        
+        # A. Process Original Images (Download from URL)
+        async with httpx.AsyncClient() as client:
+            for url in original_image_urls:
+                try:
+                    # Skip if invalid URL
+                    if not url or not url.startswith('http'): continue
+                    
+                    resp = await client.get(url)
+                    if resp.status_code == 200:
+                        content_type = resp.headers.get("content-type", "image/jpeg")
+                        file_parts.append({
+                            "mime_type": content_type,
+                            "data": base64.b64encode(resp.content).decode('utf-8')
+                        })
+                        original_count += 1
+                except Exception as img_err:
+                    print(f"Failed to download original image {url}: {img_err}")
+
+        # B. Process New Images (UploadFile)
+        new_count = 0
+        for file in images:
+            content = await file.read()
+            file_parts.append({
+                "mime_type": file.content_type,
+                "data": base64.b64encode(content).decode('utf-8') 
+            })
+            new_count += 1
+
+        print(f"📸 Images prepared: {original_count} Original + {new_count} New")
+
+        # 3. Prompt for Comparison
+        prompt_text = f"""
+          You are a Return Inspection Officer for medical equipment ranges.
+          Item: {item_title}
+          
+          CONTEXT:
+          I have provided {original_count + new_count} images total.
+          - The FIRST {original_count} images are the ORIGINAL CONDITION (Reference photos taken when listed).
+          - The LAST {new_count} images are the RETURN CONDITION (Current photos taken now).
+          
+          ORIGINAL SAFETY REPORT (Text):
+          "{original_condition}"
+          
+          TASK:
+          1. Analyze the Original Images (First {original_count}) to understand the baseline state.
+          2. Compare the Return Images (Last {new_count}) against those Original Images.
+          3. Look for NEW significant damages (cracks, water damage, broken parts) that were NOT present in the Original Images.
+          
+          Normal wear and tear (minor scratches) is acceptable.
+          
+          If successful return (no new damage), suggested_deduction should be 0.
+          If new damage found, estimate a fair deduction amount in Indian Rupees (INR) from the deposit.
+          
+          Return strictly valid JSON:
+          {{
+            "status": "clear" | "damage_reported",
+            "new_damage_found": ["string", "string"] (List specific new flaws, empty if none),
+            "analysis": "string (Short comparison summary citing specific differences between old and new photos)",
+            "suggested_deduction": number (Amount in INR, 0 if clean)
+          }}
+        """
+
+        # 4. Get Verdict
+        # Note: call_gemini appends images in order of file_parts list
+        result = await call_gemini(prompt_text, file_parts)
+        print("✅ Return Audit Verdict:", result)
+        
+        return result
+
+    except Exception as e:
+        print("Return Audit Error:", e)
+        # Detailed logging
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 # ==========================================

@@ -263,8 +263,8 @@ async def scan_handover(payload: dict = Body(...)):
          raise HTTPException(status_code=400, detail="Missing bookingId")
 
     try:
-        # Fetch real code
-        response = supabase.table("bookings").select("handover_code").eq("id", booking_id).execute()
+        # Fetch real code and item_id (needed for return to free up item)
+        response = supabase.table("bookings").select("handover_code, item_id").eq("id", booking_id).execute()
         
         if not response.data:
             return JSONResponse(status_code=404, content={"error": "Booking not found"})
@@ -277,14 +277,24 @@ async def scan_handover(payload: dict = Body(...)):
 
         # Validate
         if str(booking.get("handover_code")) == str(scanned_code):
-            # SUCCESS: Update status
-            supabase.table("bookings").update({
-                "status": "in_use", 
-                "handover_code": None
-            }).eq("id", booking_id).execute()
+            
+            updates = {"handover_code": None}
+            
+            if handover_type == 'pickup':
+                updates["status"] = "in_use"
+                message = "Rental Started! Handover Complete."
+            
+            elif handover_type == 'return':
+                updates["status"] = "completed"
+                # Make item available again
+                supabase.table("items").update({"is_available": True}).eq("id", booking["item_id"]).execute()
+                message = "Return Successful! Item is now available."
+            
+            # Update Booking
+            supabase.table("bookings").update(updates).eq("id", booking_id).execute()
 
-            print(f"🔓 Handover Successful for Booking {booking_id}")
-            return {"success": True, "message": "Handover Complete!"}
+            print(f"🔓 {handover_type.upper()} Handover Successful for Booking {booking_id}")
+            return {"success": True, "message": message}
         else:
             print(f"❌ Invalid Code: DB={db_code} vs Input={input_code}")
             return JSONResponse(

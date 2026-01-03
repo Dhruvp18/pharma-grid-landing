@@ -13,7 +13,6 @@ interface HandoverModalProps {
     variant?: 'pickup' | 'return'; // New prop
     onSuccess?: () => void;
     trigger?: React.ReactNode;
-    variant?: 'pickup' | 'return';
 }
 
 export function HandoverModal({ bookingId, role, onSuccess, trigger, variant = 'pickup' }: HandoverModalProps) {

@@ -27,6 +27,8 @@ import { Review } from "@/types/reviews";
 import { Link } from "react-router-dom";
 
 
+import { AIChatWidget } from "@/components/AIChatWidget";
+
 const DiscoveryMap = () => {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<tt.Map | null>(null);
@@ -50,6 +52,7 @@ const DiscoveryMap = () => {
     const [itemReviews, setItemReviews] = useState<Review[]>([]);
     const [userBookingId, setUserBookingId] = useState<string | null>(null);
     const [showReviewForm, setShowReviewForm] = useState(false);
+    const [chatContext, setChatContext] = useState<any>(null);
 
 
     const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
@@ -819,7 +822,15 @@ const DiscoveryMap = () => {
 
             {/* Detail Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+                <DialogContent
+                    className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0"
+                    onInteractOutside={(e) => {
+                        const target = e.target as Element;
+                        if (target.closest('.ai-chat-widget-container')) {
+                            e.preventDefault();
+                        }
+                    }}
+                >
                     <DialogHeader className="p-6 border-b">
                         <div className="flex justify-between items-start">
                             <div>
@@ -923,6 +934,19 @@ const DiscoveryMap = () => {
                                                     item={selectedDetailedItem}
                                                     onSuccess={() => setIsDialogOpen(false)}
                                                 />
+                                                <Button
+                                                    variant="outline"
+                                                    className="border-teal-600 text-teal-700 hover:bg-teal-50"
+                                                    onClick={() => setChatContext({
+                                                        device_name: selectedDetailedItem.title,
+                                                        category: selectedDetailedItem.category,
+                                                        description: selectedDetailedItem.description,
+                                                        images: startImages,
+                                                        model: "Generic"
+                                                    })}
+                                                >
+                                                    Ask AI
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -963,6 +987,13 @@ const DiscoveryMap = () => {
                 </DialogContent>
             </Dialog>
 
+            {/* Contextual Chat Widget */}
+            {chatContext && (
+                <AIChatWidget
+                    key={chatContext.device_name}
+                    initialContext={chatContext}
+                />
+            )}
         </>
     );
 };

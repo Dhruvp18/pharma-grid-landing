@@ -34,11 +34,14 @@ interface Booking {
     contact_phone?: string;
 }
 
+import { AIChatWidget } from "@/components/AIChatWidget";
+
 const Bookings = () => {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [hostedBookings, setHostedBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [chatContext, setChatContext] = useState<any>(null);
     const navigate = useNavigate();
 
     const fetchBookings = async () => {
@@ -52,7 +55,7 @@ const Bookings = () => {
         // Fetch My Orders (I am the Renter)
         const { data: myOrders } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category)`)
             .eq("renter_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -61,7 +64,7 @@ const Bookings = () => {
         // Fetch My Hosting (I am the Owner)
         const { data: myHosting } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category)`)
             .eq("owner_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -158,6 +161,23 @@ const Bookings = () => {
 
                         <div className="flex gap-3 mt-4">
                             <Button variant="outline" size="sm" onClick={() => navigate(`/map?id=${booking.item_id}`)}>View Listing</Button>
+
+                            {/* AI Companion Help */}
+                            {role === 'renter' && (
+                                <Button
+                                    size="sm"
+                                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                                    onClick={() => setChatContext({
+                                        device_name: booking.item.title,
+                                        category: 'Medical Device',
+                                        description: (booking.item as any).description,
+                                        images: [(booking.item as any).image_url]
+                                    })}
+                                >
+                                    <Store className="w-4 h-4 mr-2" />
+                                    Get Help
+                                </Button>
+                            )}
 
                             {/* Review Button */}
                             {role === 'renter' && (booking.status === 'completed' || booking.status === 'delivered') && (
@@ -317,6 +337,14 @@ const Bookings = () => {
                     </Tabs>
                 )}
             </div>
+
+            {/* Contextual Chat Widget */}
+            {chatContext && (
+                <AIChatWidget
+                    key={chatContext.device_name}
+                    initialContext={chatContext}
+                />
+            )}
         </div>
     );
 };

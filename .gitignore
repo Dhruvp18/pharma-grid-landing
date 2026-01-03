@@ -29,3 +29,6 @@ __pycache__
 
 # virtual env
 viraj
+
+#pycache
+pharma-backend/__pycache__

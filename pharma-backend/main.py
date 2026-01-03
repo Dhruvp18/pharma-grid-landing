@@ -60,6 +60,9 @@ supabase: Client = create_client(SUPABASE_URL, supabase_key)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-flash-latest', safety_settings=safety_config)
 
+# --- Agno Agent ---
+from medical_agent import get_agent_response
+
 # --- HELPER: Call Gemini API ---
 # We use a helper to keep the endpoints clean, mimicking the Node structure
 async def call_gemini(prompt_text: str, file_parts: list):
@@ -526,6 +529,29 @@ async def get_public_profile(user_id: str):
     except Exception as e:
          print(f"Profile Error: {e}")
          return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ==========================================
+#  FEATURE 7: AI COMPANION & MEDICAL AGENT
+# ==========================================
+@app.post("/chat-ai")
+async def chat_ai(payload: dict = Body(...)):
+    message = payload.get("message")
+    context = payload.get("context", {}) # Optional: {device_name, category, ...}
+    
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    print(f"🤖 AI Chat Query: {message} | Context: {context.get('device_name', 'None')}")
+    
+    try:
+        # Delegate to Agno Agent
+        response = get_agent_response(message, context)
+        return {"response": response}
+
+    except Exception as e:
+        print(f"AI Agent Error: {e}")
+        return JSONResponse(status_code=500, content={"error": "AI Service Unavailable"})
 
 
 if __name__ == "__main__":

@@ -17,6 +17,8 @@ import PublicProfile from "./pages/PublicProfile";
 
 const queryClient = new QueryClient();
 
+import { AIChatWidget } from "./components/AIChatWidget";
+
 const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
@@ -37,6 +39,8 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+          {/* Global Medical Assistant */}
+          <AIChatWidget />
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

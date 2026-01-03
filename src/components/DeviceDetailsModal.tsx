@@ -113,7 +113,7 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
         try {
             const { data, error } = await supabase
                 .from('reviews')
-                .select('*, reviewer:profiles(full_name, avatar_url)')
+                .select('*, profiles:profiles!reviewer_id(full_name, avatar_url)')
                 .eq('item_id', id)
                 .order('created_at', { ascending: false });
 

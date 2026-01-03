@@ -35,7 +35,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 px-4 overflow-hidden">
+    <section className="relative pt-12 pb-16 md:pt-20 md:pb-24 px-4 overflow-hidden">
       {/* Subtle background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-teal-light/50 via-background to-background pointer-events-none" />
 

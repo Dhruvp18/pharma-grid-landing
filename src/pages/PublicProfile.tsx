@@ -110,7 +110,7 @@ const PublicProfile = () => {
             </Helmet>
             <Navbar />
 
-            <main className="container max-w-5xl py-24 px-4">
+            <main className="container max-w-5xl pt-8 pb-12 px-4">
                 {/* Header Profile Card */}
                 <div className="bg-card border rounded-3xl p-6 md:p-10 shadow-sm mb-8 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-primary/10 to-blue-200/20 -z-10" />

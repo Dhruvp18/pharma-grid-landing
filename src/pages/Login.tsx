@@ -43,7 +43,7 @@ const Login = () => {
     return (
         <div className="min-h-screen bg-background">
             <Navbar />
-            <div className="container flex items-center justify-center min-h-[calc(100vh-80px)] pt-20">
+            <div className="container flex items-center justify-center min-h-[calc(100vh-80px)] pt-8">
                 <div className="w-full max-w-md p-8 space-y-6 glass-card rounded-2xl animate-fade-in-up">
                     <div className="text-center space-y-2">
                         <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>

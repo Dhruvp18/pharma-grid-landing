@@ -8,11 +8,12 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Calendar, MapPin, IndianRupee, Truck, Store, CheckCircle2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { HandoverModal } from "@/components/HandoverModal";
 import { LiveTracking } from "@/components/LiveTracking";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/config";
+import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
 
 interface Booking {
     id: string;
@@ -43,7 +44,12 @@ const Bookings = () => {
     const [loading, setLoading] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [chatContext, setChatContext] = useState<any>(null);
+    const [viewingItemId, setViewingItemId] = useState<string | null>(null);
+    const [reviewingBookingId, setReviewingBookingId] = useState<string | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentTab = searchParams.get("tab") || "orders";
 
     const fetchBookings = async () => {
         setLoading(true);
@@ -223,7 +229,17 @@ const Bookings = () => {
                         </div>
 
                         <div className="flex gap-3 mt-4">
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/map?id=${booking.item_id}`)}>View Listing</Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setViewingItemId(booking.item_id);
+                                    setReviewingBookingId(null);
+                                    setIsModalOpen(true);
+                                }}
+                            >
+                                View Listing
+                            </Button>
 
                             {/* AI Companion Help */}
                             {role === 'renter' && (
@@ -247,7 +263,11 @@ const Bookings = () => {
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => navigate(`/map?id=${booking.item_id}&action=review&bookingId=${booking.id}`)}
+                                    onClick={() => {
+                                        setViewingItemId(booking.item_id);
+                                        setReviewingBookingId(booking.id);
+                                        setIsModalOpen(true);
+                                    }}
                                 >
                                     Leave Review
                                 </Button>
@@ -485,7 +505,7 @@ const Bookings = () => {
                         <Loader2 className="w-10 h-10 animate-spin text-primary" />
                     </div>
                 ) : (
-                    <Tabs defaultValue="orders" className="w-full">
+                    <Tabs value={currentTab} onValueChange={(val) => setSearchParams({ tab: val })} className="w-full">
                         <TabsList className="grid w-full grid-cols-2 mb-8">
                             <TabsTrigger value="orders">My Orders (Renting)</TabsTrigger>
                             <TabsTrigger value="hosting">My Equipment (Lending)</TabsTrigger>
@@ -527,6 +547,13 @@ const Bookings = () => {
                     initialContext={chatContext}
                 />
             )}
+
+            <DeviceDetailsModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                itemId={viewingItemId}
+                userBookingIdForReview={reviewingBookingId}
+            />
         </div>
     );
 };

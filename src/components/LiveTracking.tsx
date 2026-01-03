@@ -30,20 +30,20 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
         ? ['Order Accepted', 'On the Way', 'Delivered']
         : ['Return Accepted', 'On the Way', 'Returned'];
 
-    // Map Booking Status to Step Index (1, 2, 3)
+    // Map Booking Status to Step Index (0, 1, 2)
     const getStep = () => {
-        if (variant === 'delivery') {
-            if (bookingStatus === 'delivered') return 3;
-            if (bookingStatus === 'picked_up') return 2;
-            return 1;
+        if (variant === 'return') {
+            if (bookingStatus === 'return_accepted') return 0;
+            else if (bookingStatus === 'return_picked_up') return 1;
+            else if (bookingStatus === 'return_delivered') return 2;
+            else if (bookingStatus === 'returned' || bookingStatus === 'completed') return 2; // 'Returned' is the final step
+            return 0;
         } else {
-            // Return Flow
-            // return_accepted -> Step 1
-            // return_picked_up -> Step 2
-            // completed -> Step 3
-            if (bookingStatus === 'completed') return 3;
-            if (bookingStatus === 'return_picked_up') return 2;
-            return 1;
+            // Delivery / Pickup
+            if (bookingStatus === 'requested' || bookingStatus === 'accepted') return 0;
+            else if (bookingStatus === 'picked_up' || bookingStatus === 'in_use') return 1;
+            else if (bookingStatus === 'delivered' || bookingStatus === 'completed') return 2; // Arrived / Delivered
+            return 0;
         }
     };
 
@@ -59,7 +59,7 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
             return;
         }
 
-        const isComplete = (variant === 'delivery' && bookingStatus === 'delivered') || (variant === 'return' && bookingStatus === 'completed');
+        const isComplete = (variant === 'delivery' && bookingStatus === 'delivered') || (variant === 'return' && (bookingStatus === 'completed' || bookingStatus === 'returned'));
 
         if (isComplete) {
             setInternalStatus(variant === 'delivery' ? "Delivered" : "Returned");

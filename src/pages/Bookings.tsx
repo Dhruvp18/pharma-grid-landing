@@ -20,7 +20,7 @@ interface Booking {
     start_date: string;
     end_date: string;
     total_price: number;
-    status: 'pending' | 'requested' | 'accepted' | 'in_use' | 'completed' | 'cancelled' | 'delivered' | 'picked_up' | 'return_requested' | 'return_accepted' | 'return_picked_up' | 'returned';
+    status: 'pending' | 'requested' | 'accepted' | 'in_use' | 'completed' | 'cancelled' | 'delivered' | 'picked_up' | 'return_requested' | 'return_accepted' | 'return_picked_up' | 'return_delivered' | 'returned';
     item_id: string;
     delivery_method?: 'pickup' | 'delivery'; // Optional as older bookings might not have it
     delivery_address?: string;
@@ -105,6 +105,7 @@ const Bookings = () => {
             case 'accepted': return 'bg-blue-100 text-blue-800';
             case 'in_use': return 'bg-green-100 text-green-800';
             case 'completed': return 'bg-gray-100 text-gray-800';
+            case 'return_delivered': return 'bg-orange-100 text-orange-800';
             case 'returned': return 'bg-emerald-100 text-emerald-800';
             default: return 'bg-gray-100 text-gray-800';
         }
@@ -276,7 +277,7 @@ const Bookings = () => {
                                 </Button>
                             )}
 
-                            {role === 'renter' && (booking.status === 'return_accepted' || booking.status === 'return_picked_up') && (
+                            {role === 'renter' && (booking.status === 'return_accepted' || booking.status === 'return_picked_up' || booking.status === 'return_delivered') && (
                                 <div className="flex gap-2 ml-2">
                                     <LiveTracking
                                         source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
@@ -359,7 +360,7 @@ const Bookings = () => {
                                         </Button>
                                     )}
 
-                                    {(booking.status === 'return_accepted' || booking.status === 'return_picked_up') && (
+                                    {(booking.status === 'return_accepted' || booking.status === 'return_picked_up' || booking.status === 'return_delivered') && (
                                         <div className="flex gap-2 mt-2">
                                             <LiveTracking
                                                 source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
@@ -367,32 +368,10 @@ const Bookings = () => {
                                                 status={booking.status}
                                                 variant="return"
                                                 onArrival={async () => {
-                                                    // Automate Return Completion
-                                                    try {
-                                                        // 1. Update Booking Status
-                                                        const { error: bookingError } = await supabase
-                                                            .from("bookings")
-                                                            .update({ status: 'returned' })
-                                                            .eq("id", booking.id);
-
-                                                        if (bookingError) throw bookingError;
-
-                                                        // 2. Make Item Available Again
-                                                        const { error: itemError } = await supabase
-                                                            .from("items")
-                                                            .update({ is_available: true }) // Note: check exact column name in Supabase. Usually 'available' or 'is_available'. checking lines_viewed... 'available' is used in Requirements.txt/Main.py view? No, in main.py it uses `is_available = True`. Wait, let me check `fetchBookings` select... `item:items(...)`. It doesn't select available.
-                                                            // Let's assume 'available' based on standard, or 'is_available'. In main.py `scan_handover` logic (which I wrote/viewed earlier) it sets `is_available = True`.
-                                                            // Let me check my previous edit to main.py. `item.is_available = True`.
-                                                            // So in Supabase table it's likely `is_available`.
-                                                            .eq("id", booking.item_id);
-
-                                                        if (itemError) throw itemError;
-
-                                                        toast.success("Return Completed! Item is now available.");
-                                                        handleRefresh();
-                                                    } catch (err) {
-                                                        console.error("Error completing return:", err);
-                                                        toast.error("Failed to complete return automation");
+                                                    // Driver Arrived: Update status to 'return_delivered' and require handshake
+                                                    if (booking.status !== 'return_delivered' && booking.status !== 'returned') {
+                                                        handleStatusUpdate(booking.id, 'return_delivered');
+                                                        toast.info("Return Item Arrived. Verify Code with Renter/Driver.");
                                                     }
                                                 }}
                                             />
@@ -401,7 +380,11 @@ const Bookings = () => {
                                                 role="owner"
                                                 variant="return"
                                                 onSuccess={handleRefresh}
-                                                trigger={<Button size="sm">Confirm Return Receipt</Button>}
+                                                trigger={
+                                                    <Button size="sm" variant={booking.status === 'return_delivered' ? "default" : "outline"}>
+                                                        {booking.status === 'return_delivered' ? "Verify Return Code" : "Confirm Return Receipt"}
+                                                    </Button>
+                                                }
                                             />
                                         </div>
                                     )}

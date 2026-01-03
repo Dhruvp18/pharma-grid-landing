@@ -21,6 +21,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { BookingModal } from "@/components/BookingModal";
+import ReviewList from "@/components/ReviewList";
+import ReviewForm from "@/components/ReviewForm";
+import { Review } from "@/types/reviews";
+import { Link } from "react-router-dom";
 
 
 const DiscoveryMap = () => {
@@ -43,6 +47,9 @@ const DiscoveryMap = () => {
     const [selectedDetailedItem, setSelectedDetailedItem] = useState<any>(null);
     const [startImages, setItemImages] = useState<string[]>([]);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [itemReviews, setItemReviews] = useState<Review[]>([]);
+    const [userBookingId, setUserBookingId] = useState<string | null>(null);
+    const [showReviewForm, setShowReviewForm] = useState(false);
 
 
     const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
@@ -798,31 +805,67 @@ const DiscoveryMap = () => {
                                             </div>
                                             <Separator className="my-3" />
                                             {selectedDetailedItem.owner_id && (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <Phone className="w-4 h-4 text-muted-foreground" />
-                                                        <span>{selectedDetailedItem.contact_phone || "Contact hidden"}</span>
+                                                <div className="flex items-center gap-3 mb-4 p-3 bg-secondary/20 rounded-lg">
+                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                                                        U
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                                                        <span className="text-sm text-muted-foreground">{selectedDetailedItem.address_text}</span>
+                                                    <div>
+                                                        <p className="text-sm font-medium">Owner</p>
+                                                        <Link
+                                                            to={`/profile/${selectedDetailedItem.owner_id}`}
+                                                            className="text-xs text-primary hover:underline font-semibold"
+                                                        >
+                                                            View Profile & Ratings
+                                                        </Link>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <BookingModal item={selectedDetailedItem} />
+                                            <div className="flex gap-2">
+                                                <BookingModal
+                                                    item={selectedDetailedItem}
+                                                    onSuccess={() => setIsDialogOpen(false)}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* Reviews Section */}
+                                    <div className="mt-8 border-t pt-6">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-xl font-bold">Reviews</h3>
+                                            {userBookingId && !showReviewForm && (
+                                                <Button variant="outline" size="sm" onClick={() => setShowReviewForm(true)}>
+                                                    Write a Review
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {showReviewForm && userBookingId && (
+                                            <div className="mb-6 animate-in slide-in-from-top-2">
+                                                <ReviewForm
+                                                    bookingId={userBookingId}
+                                                    onSuccess={() => {
+                                                        setShowReviewForm(false);
+                                                        fetchItemDetails(selectedDetailedItem.id); // Refresh reviews
+                                                    }}
+                                                    onCancel={() => setShowReviewForm(false)}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <ReviewList reviews={itemReviews} />
+                                    </div>
+
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-muted-foreground p-10">
-                                Item not found.
-                            </div>
+                            <div className="p-6 text-center text-muted-foreground">Select an item to view details</div>
                         )}
                     </div>
                 </DialogContent>
             </Dialog>
+
         </>
     );
 };

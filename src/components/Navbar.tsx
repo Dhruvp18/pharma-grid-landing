@@ -106,7 +106,17 @@ const Navbar = () => {
                   <DropdownMenuSeparator />
                   <Link to="/bookings">
                     <DropdownMenuItem>
-                      My Bookings
+                      My Orders
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link to="/my-equipments">
+                    <DropdownMenuItem>
+                      My Equipments
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link to={`/profile/${session.user.id}`}>
+                    <DropdownMenuItem>
+                      My Public Profile
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuItem onClick={handleLogout}>

@@ -362,7 +362,8 @@ async def create_listing(
             # We try to save contact info if columns exist
             # Note: User reported DB columns have typos: 'contect_email' and 'contect_phone'
             "contact_email": contact_email,
-            "contact_phone": contact_phone
+            "contact_phone": contact_phone,
+            "images": []
         }
 
         # 3. Insert
@@ -429,6 +430,102 @@ async def create_listing(
     except Exception as e:
         print(f"❌ Error creating item: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ==========================================
+#  FEATURE 5: REVIEWS & RATINGS (Supabase)
+# ==========================================
+
+@app.post("/reviews")
+async def create_review(
+    booking_id: str = Body(...),
+    rating: int = Body(...),
+    comment: str = Body(...),
+    reviewer_id: str = Body(...)
+):
+    try:
+        # 1. Verify Booking exists
+        booking_res = supabase.table("bookings").select("*").eq("id", booking_id).execute()
+        if not booking_res.data:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        
+        booking = booking_res.data[0]
+        
+        # 2. Extract item_id and owner_id from booking
+        item_id = booking.get("item_id")
+        owner_id = booking.get("owner_id")
+        
+        # 3. Insert Review
+        data = {
+            "booking_id": booking_id,
+            "reviewer_id": reviewer_id,
+            "rating": rating,
+            "comment": comment,
+            "item_id": item_id,
+            "owner_id": owner_id
+        }
+        
+        res = supabase.table("reviews").insert(data).execute()
+        
+        if not res.data:
+             raise HTTPException(status_code=500, detail="Failed to save review")
+             
+        return {"success": True, "review": res.data[0]}
+
+    except Exception as e:
+        print(f"Review Error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/reviews/item/{item_id}")
+async def get_item_reviews(item_id: str):
+    try:
+        # Fetch reviews with reviewer details
+        # Note: Supabase-py syntax for foreign table join is usually select("*, profiles(*)")
+        # Assuming foreign keys are set up correctly: reviews.reviewer_id -> profiles.id
+        res = supabase.table("reviews").select("*, profiles:reviewer_id(full_name, avatar_url)").eq("item_id", item_id).order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        print(f"Get Item Reviews Error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/reviews/owner/{owner_id}")
+async def get_owner_reviews(owner_id: str):
+    try:
+        # Fetch reviews for all items owned by this user
+        res = supabase.table("reviews").select("*, profiles:reviewer_id(full_name, avatar_url), items(title)").eq("owner_id", owner_id).order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        print(f"Get Owner Reviews Error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/profile/{user_id}")
+async def get_public_profile(user_id: str):
+    try:
+        # 1. Get Profile Info
+        profile_res = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
+        if not profile_res.data:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        profile = profile_res.data
+        
+        # 2. Get Aggregated Rating
+        # Supabase-py doesn't have easy AVG helper yet without stored procedure/RPC. 
+        # We will fetch all ratings (lightweight) and calc avg in python for now, or use RPC if user prefers.
+        # Python approach is easier for prototype.
+        reviews_res = supabase.table("reviews").select("rating").eq("owner_id", user_id).execute()
+        
+        ratings = [r['rating'] for r in reviews_res.data]
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
+        
+        return {
+            "profile": profile,
+            "rating": round(avg_rating, 1),
+            "total_reviews": len(ratings)
+        }
+        
+    except Exception as e:
+         print(f"Profile Error: {e}")
+         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingModal from "./components/OnboardingModal";
 import Bookings from "./pages/Bookings";
+import MyEquipments from "./pages/MyEquipments";
+import PublicProfile from "./pages/PublicProfile";
 
 const queryClient = new QueryClient();
 
@@ -26,10 +28,12 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/profile/:id" element={<PublicProfile />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/list-device" element={<ListDevice />} />
               <Route path="/map" element={<DiscoveryMap />} />
               <Route path="/bookings" element={<Bookings />} />
+              <Route path="/my-equipments" element={<MyEquipments />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

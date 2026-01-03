@@ -173,13 +173,13 @@ const DiscoveryMap = () => {
 
             // Create Marker (without Binding Popup to Click)
             const marker = new tt.Marker()
-                .setLngLat([item.lon, item.lat])
+                .setLngLat(new tt.LngLat(item.lon, item.lat))
                 .addTo(map.current!);
 
             // Add Hover Listeners to Marker Element
             const element = marker.getElement();
             element.addEventListener('mouseenter', () => {
-                popup.setLngLat([item.lon, item.lat]).addTo(map.current!);
+                popup.setLngLat(new tt.LngLat(item.lon, item.lat)).addTo(map.current!);
             });
             element.addEventListener('mouseleave', () => {
                 popup.remove();
@@ -399,7 +399,7 @@ const DiscoveryMap = () => {
                 markerElement.style.boxShadow = '0 0 0 4px rgba(66, 133, 244, 0.3), 0 0 15px rgba(66, 133, 244, 0.5)'; // Pulse/Glow effect
 
                 const marker = new tt.Marker({ element: markerElement })
-                    .setLngLat([lon, lat])
+                    .setLngLat(new tt.LngLat(lon, lat))
                     .setPopup(new tt.Popup().setHTML("<h3>You are here</h3>"))
                     .addTo(map.current);
 
@@ -557,7 +557,7 @@ const DiscoveryMap = () => {
     useEffect(() => {
         if (userLocation && userMarker.current) {
             // @ts-ignore
-            userMarker.current.setLngLat([userLocation.lon, userLocation.lat]);
+            userMarker.current.setLngLat(new tt.LngLat(userLocation.lon, userLocation.lat));
         }
     }, [userLocation]);
 

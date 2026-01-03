@@ -139,6 +139,38 @@ const Bookings = () => {
         }
     };
 
+    const handleCancelBooking = async (bookingId: string, itemId: string) => {
+        if (!confirm("Are you sure you want to cancel this booking?")) return;
+
+        try {
+            // 1. Update Booking Status to 'cancelled'
+            const { error: bookingError } = await supabase
+                .from("bookings")
+                .update({ status: 'cancelled' })
+                .eq("id", bookingId);
+
+            if (bookingError) throw bookingError;
+
+            // 2. Make Item Available Again
+            const { error: itemError } = await supabase
+                .from("items")
+                .update({ is_available: true })
+                .eq("id", itemId);
+
+            if (itemError) {
+                console.error("Failed to restore item availability:", itemError);
+                toast.warning("Booking cancelled, but failed to update item availability. Please contact support.");
+            } else {
+                toast.success("Booking cancelled successfully.");
+            }
+
+            handleRefresh();
+        } catch (error: any) {
+            console.error("Cancellation error:", error);
+            toast.error(error.message || "Failed to cancel booking");
+        }
+    };
+
     const BookingCard = ({ booking, role }: { booking: Booking, role: 'renter' | 'owner' }) => {
         const itemTitle = booking.item?.title || "Unknown Item";
         const itemImage = booking.item?.image_url || "https://images.unsplash.com/photo-1584515933487-779824d29309?w=800&auto=format&fit=crop";
@@ -211,7 +243,7 @@ const Bookings = () => {
                             )}
 
                             {/* Review Button */}
-                            {role === 'renter' && (booking.status === 'completed' || booking.status === 'delivered' || booking.status === 'in_use') && (
+                            {role === 'renter' && (booking.status === 'completed' || booking.status === 'delivered' || booking.status === 'in_use' || booking.status === 'returned') && (
                                 <Button
                                     size="sm"
                                     variant="secondary"
@@ -302,6 +334,18 @@ const Bookings = () => {
                             {role === 'renter' && booking.status === 'requested' && isDelivery && (
                                 <Button variant="outline" size="sm" disabled>
                                     <Truck className="w-4 h-4 mr-2" /> Waiting for Approval
+                                </Button>
+                            )}
+
+                            {/* Renter Cancel Option */}
+                            {role === 'renter' && (booking.status === 'requested' || booking.status === 'accepted' || booking.status === 'picked_up') && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="ml-2"
+                                    onClick={() => handleCancelBooking(booking.id, booking.item_id)}
+                                >
+                                    Cancel Booking
                                 </Button>
                             )}
 
@@ -404,6 +448,18 @@ const Bookings = () => {
                                                 trigger={<Button size="sm">Confirm Return Receipt</Button>}
                                             />
                                         </div>
+                                    )}
+
+                                    {/* Owner Cancel/Reject Option */}
+                                    {(booking.status === 'requested' || booking.status === 'accepted' || booking.status === 'picked_up') && (
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            className="ml-2"
+                                            onClick={() => handleCancelBooking(booking.id, booking.item_id)}
+                                        >
+                                            {booking.status === 'requested' ? 'Reject Request' : 'Cancel Booking'}
+                                        </Button>
                                     )}
                                 </>
                             )}

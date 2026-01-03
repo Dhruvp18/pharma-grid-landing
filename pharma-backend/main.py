@@ -285,7 +285,7 @@ async def scan_handover(payload: dict = Body(...)):
                 message = "Rental Started! Handover Complete."
             
             elif handover_type == 'return':
-                updates["status"] = "completed"
+                updates["status"] = "returned"
                 # Make item available again
                 supabase.table("items").update({"is_available": True}).eq("id", booking["item_id"]).execute()
                 message = "Return Successful! Item is now available."

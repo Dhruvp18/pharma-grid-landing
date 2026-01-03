@@ -12,6 +12,7 @@ import ReviewList from "@/components/ReviewList";
 import { Review } from "@/types/reviews";
 import { format } from "date-fns";
 import { Helmet } from "react-helmet-async";
+import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
 
 interface ProfileData {
     id: string;
@@ -33,6 +34,8 @@ const PublicProfile = () => {
     const [reviews, setReviews] = useState<Review[]>([]);
     const [items, setItems] = useState<any[]>([]); // Using any for simplicity for now, ideally Item interface
     const [isLoading, setIsLoading] = useState(true);
+    const [viewingItemId, setViewingItemId] = useState<string | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -168,7 +171,10 @@ const PublicProfile = () => {
                                     <div
                                         key={item.id}
                                         className="group bg-card rounded-2xl overflow-hidden border hover:shadow-lg transition-all cursor-pointer"
-                                        onClick={() => navigate(`/map?id=${item.id}`)}
+                                        onClick={() => {
+                                            setViewingItemId(item.id);
+                                            setIsModalOpen(true);
+                                        }}
                                     >
                                         <div className="aspect-[4/3] overflow-hidden relative bg-gray-100">
                                             <img
@@ -206,6 +212,12 @@ const PublicProfile = () => {
                     </TabsContent>
                 </Tabs>
             </main>
+
+            <DeviceDetailsModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                itemId={viewingItemId}
+            />
         </div>
     );
 };

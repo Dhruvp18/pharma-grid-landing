@@ -14,6 +14,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
 
 interface Item {
     id: string;
@@ -28,6 +29,8 @@ interface Item {
 const MyEquipments = () => {
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
+    const [viewingItemId, setViewingItemId] = useState<string | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
 
     const fetchItems = async () => {
@@ -149,7 +152,10 @@ const MyEquipments = () => {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => navigate(`/map?id=${item.id}`)}>
+                                                <DropdownMenuItem onClick={() => {
+                                                    setViewingItemId(item.id);
+                                                    setIsModalOpen(true);
+                                                }}>
                                                     View Listing
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem disabled>
@@ -179,7 +185,10 @@ const MyEquipments = () => {
                                             <IndianRupee className="w-4 h-4" />
                                             {item.price_per_day} <span className="text-sm font-normal text-muted-foreground">/ day</span>
                                         </div>
-                                        <Button variant="secondary" size="sm" onClick={() => navigate(`/map?id=${item.id}`)}>
+                                        <Button variant="secondary" size="sm" onClick={() => {
+                                            setViewingItemId(item.id);
+                                            setIsModalOpen(true);
+                                        }}>
                                             View
                                         </Button>
                                     </div>
@@ -189,6 +198,12 @@ const MyEquipments = () => {
                     </div>
                 )}
             </div>
+
+            <DeviceDetailsModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                itemId={viewingItemId}
+            />
         </div>
     );
 };

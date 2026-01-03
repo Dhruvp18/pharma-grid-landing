@@ -20,11 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { BookingModal } from "@/components/BookingModal";
-import ReviewList from "@/components/ReviewList";
-import ReviewForm from "@/components/ReviewForm";
-import { Review } from "@/types/reviews";
 import { Link } from "react-router-dom";
+import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
 
 
 import { AIChatWidget } from "@/components/AIChatWidget";
@@ -46,13 +43,15 @@ const DiscoveryMap = () => {
 
     // Detail Card State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [selectedDetailedItem, setSelectedDetailedItem] = useState<any>(null);
-    const [startImages, setItemImages] = useState<string[]>([]);
-    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-    const [itemReviews, setItemReviews] = useState<Review[]>([]);
+    const [selectedDetailedId, setSelectedDetailedId] = useState<string | null>(null);
     const [userBookingId, setUserBookingId] = useState<string | null>(null);
-    const [showReviewForm, setShowReviewForm] = useState(false);
-    const [chatContext, setChatContext] = useState<any>(null);
+    const [chatContext, setChatContext] = useState<any>(null); // Keep for now if needed, but Modal handles its own. Actually, remove if not used elsewhere.
+    // Wait, the new components import might conflict if I don't remove unused ones.
+    // I will check if I need to keep chatContext. The previous file had <AIChatWidget> at the bottom.
+    // If I remove it from map, I rely on Modal having it. But what if user is just browsing map?
+    // "Ask AI" usually contextual. 
+    // Let's keep chatContext removed from here as it was only set in details view.
+
 
 
     const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
@@ -536,25 +535,20 @@ const DiscoveryMap = () => {
     useEffect(() => {
         const handleDeepLink = async () => {
             if (urlId) {
-                // Fetch details directly (this works even if item is not in "nearby" equipment list)
-                const itemData = await fetchItemDetails(urlId);
+                setSelectedDetailedId(urlId);
+                setIsDialogOpen(true);
 
-                if (itemData) {
-                    // Open dialog
-                    setIsDialogOpen(true);
-
-                    // Fly to location
-                    if (itemData.lat && itemData.lng) {
-                        flyToLocation(itemData.lat, itemData.lng, urlId);
+                // Fetch just for coordinates to fly to (since Modal handles details now)
+                try {
+                    const { data } = await supabase.from('items').select('lat, lng').eq('id', urlId).single();
+                    if (data) {
+                        flyToLocation(data.lat, data.lng, urlId);
                     }
+                } catch (e) { console.error("Error fetching deep link coords", e) }
 
-                    // Handle Review Action
-                    if (urlAction === 'review') {
-                        setShowReviewForm(true);
-                        if (urlBookingId) {
-                            setUserBookingId(urlBookingId);
-                        }
-                    }
+                // Handle Review Action
+                if (urlAction === 'review' && urlBookingId) {
+                    setUserBookingId(urlBookingId);
                 }
             }
         };
@@ -578,62 +572,11 @@ const DiscoveryMap = () => {
 
     const handleViewDetails = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        fetchItemDetails(id);
+        setSelectedDetailedId(id);
         setIsDialogOpen(true);
     };
 
-    const fetchItemDetails = async (id: string) => {
-        setIsLoadingDetails(true);
-        setSelectedDetailedItem(null);
-        setItemImages([]);
 
-        try {
-            // 1. Fetch Item Details
-            const { data: itemData, error: itemError } = await supabase
-                .from('items')
-                .select('*, owner:profiles(full_name, phone, email)')
-                .eq('id', id)
-                .single();
-
-            if (itemError) throw itemError;
-            setSelectedDetailedItem(itemData);
-
-            // Removed redundant if(itemError) check since we throw above
-
-            if (itemData.images && Array.isArray(itemData.images) && itemData.images.length > 0) {
-                console.log("Using Database Images Column:", itemData.images);
-                setItemImages(itemData.images);
-            } else {
-                // FALLBACK: Try to list from storage (old way)
-                console.warn("Using Storage List fallback for images...");
-                const { data: files, error: storageError } = await supabase
-                    .storage
-                    .from('device-images')
-                    .list(id);
-
-                if (storageError) {
-                    console.error("Storage list error:", storageError);
-                    if (itemData.image_url) setItemImages([itemData.image_url]);
-                } else if (files && files.length > 0) {
-                    const urls = files.map(file => {
-                        return supabase.storage.from('device-images').getPublicUrl(`${id}/${file.name}`).data.publicUrl;
-                    });
-                    setItemImages(urls);
-                } else {
-                    if (itemData.image_url) setItemImages([itemData.image_url]);
-                }
-            }
-
-            return itemData; // Return data for caller
-
-        } catch (error) {
-            console.error("Error fetching details:", error);
-            toast.error("Failed to load item details.");
-            return null;
-        } finally {
-            setIsLoadingDetails(false);
-        }
-    };
 
 
     // Draw Route for Selected Item
@@ -834,200 +777,21 @@ const DiscoveryMap = () => {
                 </div>
             </div >
 
-            {/* Detail Dialog */}
-            < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
-                <DialogContent
-                    className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0"
-                    onInteractOutside={(e) => {
-                        const target = e.target as Element;
-                        if (target.closest('.ai-chat-widget-container')) {
-                            e.preventDefault();
-                        }
-                    }}
-                >
-                    <DialogHeader className="p-6 border-b">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <DialogTitle className="text-2xl font-bold">{selectedDetailedItem?.title || "Loading..."}</DialogTitle>
-                                <DialogDescription className="text-base mt-2">
-                                    {selectedDetailedItem?.category} • {selectedDetailedItem?.address_text}
-                                </DialogDescription>
-                            </div>
-                            {selectedDetailedItem && (
-                                <Badge variant={selectedDetailedItem.is_available ? "default" : "destructive"}>
-                                    {selectedDetailedItem.is_available ? "Available" : "Checked Out"}
-                                </Badge>
-                            )}
-                        </div>
-                    </DialogHeader>
+            {/* Reusable Detail Dialog */}
+            <DeviceDetailsModal
+                isOpen={isDialogOpen}
+                onClose={() => setIsDialogOpen(false)}
+                itemId={selectedDetailedId}
+                userBookingIdForReview={userBookingId}
+            />
 
-                    <div className="flex-1 overflow-y-auto p-6">
-                        {isLoadingDetails ? (
-                            <div className="flex items-center justify-center h-48">
-                                <span className="loading-spinner">Loading details...</span>
-                            </div>
-                        ) : selectedDetailedItem ? (
-                            <div className="space-y-6">
-                                {/* Image Gallery */}
-                                {startImages.length > 0 && (
-                                    <div className="w-full flex justify-center bg-black/5 rounded-lg py-4">
-                                        <Carousel className="w-full max-w-lg">
-                                            <CarouselContent>
-                                                {startImages.map((img, index) => (
-                                                    <CarouselItem key={index}>
-                                                        <div className="p-1">
-                                                            <div className="overflow-hidden rounded-xl aspect-video border bg-white flex items-center justify-center">
-                                                                <img
-                                                                    src={img}
-                                                                    alt={`Item Image ${index + 1}`}
-                                                                    className="w-full h-full object-contain"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </CarouselItem>
-                                                ))}
-                                            </CarouselContent>
-                                            <CarouselPrevious />
-                                            <CarouselNext />
-                                        </Carousel>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h3 className="font-semibold text-lg text-primary mb-2">Description</h3>
-                                            <p className="text-gray-600 whitespace-pre-line">{selectedDetailedItem.description || "No description provided."}</p>
-                                        </div>
-
-                                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                                            <h4 className="font-semibold text-blue-900 mb-2">Verification Status</h4>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Badge variant="outline" className="bg-white">
-                                                    Status: {selectedDetailedItem.ai_status}
-                                                </Badge>
-                                                {selectedDetailedItem.ai_status === 'verified' && (
-                                                    <span className="text-green-600 text-sm font-medium">Verified Safe</span>
-                                                )}
-                                            </div>
-                                            {selectedDetailedItem.ai_reason && (
-                                                <p className="text-sm text-blue-800 mt-2">
-                                                    {selectedDetailedItem.ai_reason}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="p-4 border rounded-xl shadow-sm">
-                                            <h3 className="text-lg font-bold mb-4">Rental Details</h3>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="text-muted-foreground">Price per Day</span>
-                                                <span className="text-xl font-bold text-primary">₹{selectedDetailedItem.price_per_day}</span>
-                                            </div>
-                                            <Separator className="my-3" />
-                                            {selectedDetailedItem.owner && (
-                                                <div className="flex flex-col gap-2 mb-4 p-3 bg-secondary/20 rounded-lg border border-secondary/30">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary border border-primary/20">
-                                                            {(selectedDetailedItem.owner.full_name?.[0] || 'U').toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-bold text-primary">
-                                                                {selectedDetailedItem.owner.full_name || "Owner"}
-                                                            </p>
-                                                            <Link
-                                                                to={`/profile/${selectedDetailedItem.owner_id}`}
-                                                                className="text-xs text-muted-foreground hover:text-primary underline"
-                                                            >
-                                                                View Profile & Ratings
-                                                            </Link>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground space-y-1 ml-13 pl-1">
-                                                        {selectedDetailedItem.owner.phone && (
-                                                            <div className="flex items-center gap-2">
-                                                                <Phone className="w-3 h-3 text-green-600" />
-                                                                <span>{selectedDetailedItem.owner.phone}</span>
-                                                            </div>
-                                                        )}
-                                                        {selectedDetailedItem.owner.email && (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="w-3 h-3 flex items-center justify-center">✉️</span>
-                                                                <span>{selectedDetailedItem.owner.email}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="flex gap-2">
-                                                <BookingModal
-                                                    item={selectedDetailedItem}
-                                                    onSuccess={() => setIsDialogOpen(false)}
-                                                />
-                                                <Button
-                                                    variant="outline"
-                                                    className="border-teal-600 text-teal-700 hover:bg-teal-50"
-                                                    onClick={() => setChatContext({
-                                                        device_name: selectedDetailedItem.title,
-                                                        category: selectedDetailedItem.category,
-                                                        description: selectedDetailedItem.description,
-                                                        images: startImages,
-                                                        model: "Generic"
-                                                    })}
-                                                >
-                                                    Ask AI
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Reviews Section */}
-                                    <div className="mt-8 border-t pt-6">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-xl font-bold">Reviews</h3>
-                                            {userBookingId && !showReviewForm && (
-                                                <Button variant="outline" size="sm" onClick={() => setShowReviewForm(true)}>
-                                                    Write a Review
-                                                </Button>
-                                            )}
-                                        </div>
-
-                                        {showReviewForm && userBookingId && (
-                                            <div className="mb-6 animate-in slide-in-from-top-2">
-                                                <ReviewForm
-                                                    bookingId={userBookingId}
-                                                    onSuccess={() => {
-                                                        setShowReviewForm(false);
-                                                        fetchItemDetails(selectedDetailedItem.id); // Refresh reviews
-                                                    }}
-                                                    onCancel={() => setShowReviewForm(false)}
-                                                />
-                                            </div>
-                                        )}
-
-                                        <ReviewList reviews={itemReviews} />
-                                    </div>
-
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-6 text-center text-muted-foreground">Select an item to view details</div>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog >
-
-            {/* Contextual Chat Widget */}
-            {
-                chatContext && (
-                    <AIChatWidget
-                        key={chatContext.device_name}
-                        initialContext={chatContext}
-                    />
-                )
-            }
+            {/* Global Chat Widget if needed for other contexts, or just remove if only used for details */}
+            {chatContext && (
+                <AIChatWidget
+                    key={chatContext.device_name}
+                    initialContext={chatContext}
+                />
+            )}
         </>
     );
 };

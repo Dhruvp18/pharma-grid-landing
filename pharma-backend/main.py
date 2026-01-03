@@ -329,6 +329,7 @@ async def create_listing(
     user_email: Optional[str] = Form(None),
     user_name: Optional[str] = Form(None),
     reason: Optional[str] = Form(None),
+    flaws_found: Optional[str] = Form(None),
     images: List[UploadFile] = File(default=[])
 ):
     print(f"📝 Creating Item in 'items' table: {title} @ ({lat}, {lng}) Owner: {owner_id}")
@@ -360,6 +361,8 @@ async def create_listing(
         # 2. Prepare Data for 'items' schema
         ai_status = "verified" if verified else "pending"
         ai_full_reason = f"Score: {safety_score}/10. {reason or ''}"
+        if flaws_found:
+             ai_full_reason += f" Flaws: {flaws_found}"
         
         # Image Handling: Use a placeholder since we don't have storage buckets set up 
         # and 'items' expects a single 'image_url' text field.

@@ -186,6 +186,9 @@ const ListDevice = () => {
         data.append("verified", "true"); // Assuming we only allow publish if verified
         data.append("safety_score", auditResult?.safety_score?.toString() || "0");
         if (auditResult?.reason) data.append("reason", auditResult.reason);
+        if (auditResult?.flaws_found && auditResult.flaws_found.length > 0) {
+            data.append("flaws_found", auditResult.flaws_found.join(", "));
+        }
 
         // Add Owner ID from Session
         const { data: { session } } = await supabase.auth.getSession();

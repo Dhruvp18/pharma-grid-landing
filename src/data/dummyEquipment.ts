@@ -9,6 +9,11 @@ export interface MedicalEquipment {
   available: boolean;
   contact: string;
   pricePerDay?: number;
+  owner?: {
+    full_name: string;
+    phone: string;
+    email: string;
+  };
 }
 
 // Helper to generate random coordinates around a center point
@@ -20,7 +25,7 @@ export const getNearbyEquipment = (lat: number, lon: number): MedicalEquipment[]
   // Generate dummy data around the user's location
   const equipmentTypes = ["Oxygen Concentrator", "ICU Bed", "Ventilator", "Ambulance"] as const;
   const hospitalNames = ["City General Hospital", "St. Mary's Clinic", "Community Health Center", "Rapid Response Unit"];
-  
+
   return Array.from({ length: 15 }).map((_, i) => ({
     id: `eq-${i}`,
     name: `${equipmentTypes[i % equipmentTypes.length]} - Unit ${i + 1}`,

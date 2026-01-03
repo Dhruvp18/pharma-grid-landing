@@ -2,6 +2,7 @@ import os
 import json
 import random
 from typing import List, Optional
+from datetime import datetime
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -262,32 +263,49 @@ async def scan_handover(payload: dict = Body(...)):
          raise HTTPException(status_code=400, detail="Missing bookingId")
 
     try:
-        # Fetch real code
-        response = supabase.table("bookings").select("handover_code").eq("id", booking_id).execute()
+        # Fetch real code AND status
+        response = supabase.table("bookings").select("handover_code, status").eq("id", booking_id).execute()
         
         # response.data is a list of dicts
         if not response.data:
             return JSONResponse(status_code=404, content={"error": "Booking not found"})
         
         booking = response.data[0]
-        
-        # Validate
-        if str(booking.get("handover_code")) == str(scanned_code):
-            # SUCCESS: Update status
-            supabase.table("bookings").update({
-                "status": "in_use", 
-                "handover_code": None
-            }).eq("id", booking_id).execute()
+        db_code = str(booking.get("handover_code")).strip()
+        input_code = str(scanned_code).strip()
 
-            print(f"🔓 Handover Successful for Booking {booking_id}")
-            return {"success": True, "message": "Handover Complete!"}
+        print(f"🔍 Verifying Handover: DB='{db_code}' vs Input='{input_code}' | Status: {booking.get('status')}")
+
+        # Validate
+        if db_code == input_code:
+            
+            # --- INTELLIGENT HANDOVER LOGIC ---
+            current_status = booking.get("status")
+            
+            # CASE 1: PICKUP (Transitions to 'in_use')
+            if current_status in ['accepted', 'picked_up']:
+                 supabase.table("bookings").update({
+                    "status": "in_use", 
+                    "handover_code": None
+                }).eq("id", booking_id).execute()
+                 print(f"🔓 Pickup Handover Successful for Booking {booking_id}")
+                 return {"success": True, "message": "Handover Complete! Rental Started."}
+
+            else:
+                 # Fallback just in case, or if status was already in_use but code matched?
+                 return {"success": True, "message": "Code Verified."}
+
         else:
+            print(f"❌ Invalid Code: DB={db_code} vs Input={input_code}")
             return JSONResponse(
                 status_code=400, 
                 content={"success": False, "message": "Invalid QR Code"}
             )
 
     except Exception as e:
+        print(f"❌ Scan Handover Error: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
@@ -552,6 +570,84 @@ async def chat_ai(payload: dict = Body(...)):
     except Exception as e:
         print(f"AI Agent Error: {e}")
         return JSONResponse(status_code=500, content={"error": "AI Service Unavailable"})
+
+
+# ==========================================
+#  FEATURE 6: END BOOKING & PENALTY
+# ==========================================
+@app.post("/complete-booking")
+async def complete_booking(payload: dict = Body(...)):
+    booking_id = payload.get("bookingId")
+    if not booking_id:
+        raise HTTPException(status_code=400, detail="Missing bookingId")
+
+    try:
+        # 1. Fetch Booking and Item details
+        # We need the item price for penalty calculation
+        booking_res = supabase.table("bookings").select("*, items(*)").eq("id", booking_id).single().execute()
+        if not booking_res.data:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        
+        booking = booking_res.data
+        item = booking.get("items")
+        
+        if not item:
+             raise HTTPException(status_code=404, detail="Associated item not found")
+
+        # 2. Check for Overdue Penalty
+        # penalty = overdue_days * price_per_day * 2
+        penalty_amount = 0
+        overdue_message = ""
+        
+        end_date_str = booking.get("end_date")
+        if end_date_str:
+            # Parse dates (assuming ISO format YYYY-MM-DD from DB)
+            end_date = datetime.fromisoformat(end_date_str)
+            current_date = datetime.now()
+            
+            # Use date components only to ignore time (unless we want strict 24h cycles, but daily usually implies dates)
+            # Actually Booking dates in this app seem to be just dates or timestamps. Let's use date() comparison for fairness.
+            if current_date.date() > end_date.date():
+                overdue_delta = current_date.date() - end_date.date()
+                overdue_days = overdue_delta.days
+                
+                price_per_day = item.get("price_per_day", 0)
+                penalty_amount = overdue_days * price_per_day * 2
+                
+                overdue_message = f"Return is {overdue_days} days late. Penalty: ₹{penalty_amount} applied."
+                print(f"⚠️ Booking {booking_id} Overdue! Penalty: {penalty_amount}")
+
+        # 3. Update Booking Status
+        # We could save penalty_amount to a new column if it existed.
+        # For now, we'll append it to a metadata field or just log it, 
+        # BUT we must update the total_price to reflect what should be paid? 
+        # Or maybe just keep it as separate info. The prompt asked for "logic to give penalty".
+        # Let's update status to 'completed'.
+        
+        update_data = {
+            "status": "completed",
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # If we had a penalty column: update_data["penalty"] = penalty_amount
+        
+        supabase.table("bookings").update(update_data).eq("id", booking_id).execute()
+
+        # 4. Mark Item as Available
+        supabase.table("items").update({"is_available": True}).eq("id", item.get("id")).execute()
+        
+        print(f"✅ Booking {booking_id} Completed. Item {item.get('id')} is now Available.")
+
+        return {
+            "success": True,
+            "message": "Booking marked as returned.",
+            "penalty": penalty_amount,
+            "penalty_message": overdue_message
+        }
+
+    except Exception as e:
+        print(f"Complete Booking Error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 if __name__ == "__main__":

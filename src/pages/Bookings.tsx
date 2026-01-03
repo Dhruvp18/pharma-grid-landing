@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Calendar, MapPin, IndianRupee, Truck, Store } from "lucide-react";
+import { Loader2, Calendar, MapPin, IndianRupee, Truck, Store, CheckCircle2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import { HandoverModal } from "@/components/HandoverModal";
 import { LiveTracking } from "@/components/LiveTracking";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/config";
 
 interface Booking {
     id: string;
@@ -106,6 +107,35 @@ const Bookings = () => {
             case 'completed': return 'bg-gray-100 text-gray-800';
             default: return 'bg-gray-100 text-gray-800';
         }
+    }
+
+    const handleCompleteBooking = async (bookingId: string) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/complete-booking`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ bookingId }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                if (data.penalty > 0) {
+                    toast.warning("Booking Completed with Penalty", {
+                        description: data.penalty_message,
+                        duration: 6000
+                    });
+                } else {
+                    toast.success(data.message);
+                }
+                handleRefresh();
+            } else {
+                toast.error(data.detail || data.error || "Failed to complete booking");
+            }
+        } catch (error) {
+            console.error("Complete booking error:", error);
+            toast.error("Network error completing booking");
+        }
     };
 
     const BookingCard = ({ booking, role }: { booking: Booking, role: 'renter' | 'owner' }) => {
@@ -180,7 +210,7 @@ const Bookings = () => {
                             )}
 
                             {/* Review Button */}
-                            {role === 'renter' && (booking.status === 'completed' || booking.status === 'delivered') && (
+                            {role === 'renter' && (booking.status === 'completed' || booking.status === 'delivered' || booking.status === 'in_use') && (
                                 <Button
                                     size="sm"
                                     variant="secondary"
@@ -224,6 +254,7 @@ const Bookings = () => {
                                             onSuccess={handleRefresh}
                                         />
                                     )}
+
                                 </div>
                             )}
 
@@ -278,6 +309,18 @@ const Bookings = () => {
                                                 />
                                             )}
                                         </div>
+                                    )}
+
+                                    {/* Mark Returned / Complete Booking */}
+                                    {(booking.status === 'in_use' || booking.status === 'delivered') && (
+                                        <Button
+                                            size="sm"
+                                            className="bg-green-600 hover:bg-green-700"
+                                            onClick={() => handleCompleteBooking(booking.id)}
+                                        >
+                                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                                            Mark Returned
+                                        </Button>
                                     )}
                                 </>
                             )}

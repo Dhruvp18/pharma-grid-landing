@@ -5,6 +5,8 @@ import { Star, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+import { API_BASE_URL } from "@/config";
+
 interface ReviewFormProps {
     bookingId: string;
     onSuccess?: () => void;
@@ -44,7 +46,7 @@ const ReviewForm = ({ bookingId, onSuccess, onCancel }: ReviewFormProps) => {
             // Wait, we can also just select the booking here and then insert. 
             // Let's use the API endpoint we created: POST /reviews
 
-            const response = await fetch("http://127.0.0.1:8000/reviews", {
+            const response = await fetch(`${API_BASE_URL}/reviews`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -90,8 +92,8 @@ const ReviewForm = ({ bookingId, onSuccess, onCancel }: ReviewFormProps) => {
                     >
                         <Star
                             className={`w-8 h-8 ${star <= (hoverRating || rating)
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-gray-300"
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-gray-300"
                                 }`}
                         />
                     </button>

@@ -527,34 +527,35 @@ const DiscoveryMap = () => {
     // improved logic: if URL ID exists, we try to find it in "equipment" list.
     // If equipment list is empty (first load), we might wait or fetch it.
     // Simple approach: When `equipment` updates, check for URL ID.
+    // Effect to handle deep linking - Independent of "nearby equipment" list
     useEffect(() => {
-        if (urlId && equipment.length > 0) {
-            const item = equipment.find(e => e.id === urlId);
-            if (item) {
-                // If not already selected or dialog closed, open it
-                if (selectedId !== urlId || !isDialogOpen) {
-                    flyToLocation(item.lat, item.lon, item.id);
-                    fetchItemDetails(urlId); // This sets isDialogOpen(false) inside? No, we set it true below.
-                    // fetchItemDetails usually just fetches data.
-                    // ensuring dialog open:
-                    setIsDialogOpen(true);
-                }
+        const handleDeepLink = async () => {
+            if (urlId) {
+                // Fetch details directly (this works even if item is not in "nearby" equipment list)
+                const itemData = await fetchItemDetails(urlId);
 
-                // Handle Review Action
-                if (urlAction === 'review') {
-                    setShowReviewForm(true);
-                    if (urlBookingId) {
-                        setUserBookingId(urlBookingId);
+                if (itemData) {
+                    // Open dialog
+                    setIsDialogOpen(true);
+
+                    // Fly to location
+                    if (itemData.lat && itemData.lng) {
+                        flyToLocation(itemData.lat, itemData.lng, urlId);
+                    }
+
+                    // Handle Review Action
+                    if (urlAction === 'review') {
+                        setShowReviewForm(true);
+                        if (urlBookingId) {
+                            setUserBookingId(urlBookingId);
+                        }
                     }
                 }
-            } else {
-                // Item might not be in "nearby" list if far away?
-                // For now, assume it's loaded via fetchEquipment initial call.
-                // If we want to support deep linking to items FAR away, we should fetch single item if not found.
-                // NOTE: fetchEquipment only gets nearby? "select *" in code, so gets all. OK.
             }
-        }
-    }, [urlId, urlAction, urlBookingId, equipment]);
+        };
+
+        handleDeepLink();
+    }, [urlId, urlAction, urlBookingId]);
 
     // Update user marker position when userLocation changes
     useEffect(() => {
@@ -595,8 +596,6 @@ const DiscoveryMap = () => {
             if (itemError) throw itemError;
             setSelectedDetailedItem(itemData);
 
-            // 2. Fetch Images
-            // Strategy: Check if 'images' array exists in DB row (Faster/More Reliable)
             if (itemData.images && Array.isArray(itemData.images) && itemData.images.length > 0) {
                 console.log("Using Database Images Column:", itemData.images);
                 setItemImages(itemData.images);
@@ -621,9 +620,12 @@ const DiscoveryMap = () => {
                 }
             }
 
+            return itemData; // Return data for caller
+
         } catch (error) {
             console.error("Error fetching details:", error);
             toast.error("Failed to load item details.");
+            return null;
         } finally {
             setIsLoadingDetails(false);
         }

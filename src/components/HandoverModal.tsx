@@ -10,11 +10,12 @@ import { API_BASE_URL } from "@/config";
 interface HandoverModalProps {
     bookingId: string;
     role: 'owner' | 'renter';
+    variant?: 'pickup' | 'return'; // New prop
     onSuccess?: () => void;
     trigger?: React.ReactNode;
 }
 
-export function HandoverModal({ bookingId, role, onSuccess, trigger }: HandoverModalProps) {
+export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, trigger }: HandoverModalProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
@@ -88,24 +89,35 @@ export function HandoverModal({ bookingId, role, onSuccess, trigger }: HandoverM
                 {trigger || (
                     <Button variant={role === 'owner' ? "default" : "outline"} className="gap-2">
                         {role === 'owner' ? <QrCode className="w-4 h-4" /> : <ScanLine className="w-4 h-4" />}
-                        {role === 'owner' ? "Start Handover" : "Confirm Handover"}
+                        {variant === 'pickup'
+                            ? (role === 'owner' ? "Start Handover" : "Confirm Handover")
+                            : (role === 'owner' ? "Confirm Return" : "Start Return")}
                     </Button>
                 )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-md text-center">
                 <DialogHeader>
                     <DialogTitle className="text-center text-xl">
-                        {role === 'owner' ? "Owner Handover" : "Renter Confirmation"}
+                        {variant === 'pickup' ? (role === 'owner' ? "Owner Handover" : "Renter Confirmation")
+                            : (role === 'owner' ? "Confirm Item Return (Owner)" : "Return Item (Renter)")}
                     </DialogTitle>
                     <DialogDescription className="text-center">
-                        {role === 'owner'
-                            ? "Generate a secure code and show it to the renter upon meeting."
-                            : "Ask the owner for the secure code and enter it below to start your rental."}
+                        {variant === 'pickup'
+                            ? (role === 'owner'
+                                ? "Generate a secure code and show it to the renter upon meeting."
+                                : "Ask the owner for the secure code and enter it below to start your rental.")
+                            : (role === 'owner'
+                                ? "Enter the code provided by the renter to confirm you have received the item back."
+                                : "Generate a code and show it to the owner when returning the item.")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="py-6 flex flex-col items-center justify-center space-y-6">
-                    {role === 'owner' ? (
+                    {/* Logic Swap: 
+                        Pickup: Owner Generates (Show QR), Renter Scans (Input) 
+                        Return: Renter Generates (Show QR), Owner Scans (Input)
+                    */}
+                    {(variant === 'pickup' && role === 'owner') || (variant === 'return' && role === 'renter') ? (
                         <>
                             {!generatedCode ? (
                                 <Button size="lg" onClick={handleGenerateCode} disabled={isLoading}>
@@ -120,8 +132,8 @@ export function HandoverModal({ bookingId, role, onSuccess, trigger }: HandoverM
                                         </span>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        Show this code to the renter. <br />
-                                        Once they enter it, the booking will become active.
+                                        Show this code to the {role === 'owner' ? 'renter' : 'owner'}. <br />
+                                        Once they enter it, the {variant === 'pickup' ? 'booking will become active' : 'return will be confirmed'}.
                                     </p>
                                 </div>
                             )}

@@ -4,3 +4,6 @@ python-multipart
 supabase
 python-dotenv
 google-generativeai
+agno
+ddgs
+google-genai

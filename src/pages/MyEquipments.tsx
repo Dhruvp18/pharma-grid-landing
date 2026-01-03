@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, MapPin, IndianRupee, Store, MoreVertical, Trash2 } from "lucide-react";
+import { Loader2, MapPin, IndianRupee, Store, MoreVertical, Trash2, Edit } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
+import { EditDeviceModal } from "@/components/EditDeviceModal";
 
 interface Item {
     id: string;
@@ -31,6 +32,11 @@ const MyEquipments = () => {
     const [loading, setLoading] = useState(true);
     const [viewingItemId, setViewingItemId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Edit State
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
     const navigate = useNavigate();
 
     const fetchItems = async () => {
@@ -158,12 +164,6 @@ const MyEquipments = () => {
                                                 }}>
                                                     View Listing
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem disabled>
-                                                    Edit Details
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem disabled>
-                                                    Edit Details
-                                                </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                                     onClick={() => handleDelete(item.id)}
@@ -185,12 +185,29 @@ const MyEquipments = () => {
                                             <IndianRupee className="w-4 h-4" />
                                             {item.price_per_day} <span className="text-sm font-normal text-muted-foreground">/ day</span>
                                         </div>
-                                        <Button variant="secondary" size="sm" onClick={() => {
-                                            setViewingItemId(item.id);
-                                            setIsModalOpen(true);
-                                        }}>
-                                            View
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setEditingItemId(item.id);
+                                                    setIsEditModalOpen(true);
+                                                }}
+                                            >
+                                                <Edit className="w-3.5 h-3.5 mr-1" />
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setViewingItemId(item.id);
+                                                    setIsModalOpen(true);
+                                                }}
+                                            >
+                                                View
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </Card>
@@ -203,6 +220,16 @@ const MyEquipments = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 itemId={viewingItemId}
+            />
+
+            <EditDeviceModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                itemId={editingItemId}
+                onSuccess={() => {
+                    fetchItems();
+                    // Optionally Toast handled in modal
+                }}
             />
         </div>
     );

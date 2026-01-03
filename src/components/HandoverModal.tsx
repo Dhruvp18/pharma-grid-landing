@@ -103,7 +103,7 @@ export function HandoverModal({ bookingId, role, onSuccess, trigger, variant = '
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant={isGenerator ? "default" : "outline"} className="gap-2">
+                    <Button variant={isGenerator ? "default" : "outline"} size="sm" className="gap-2">
                         {isGenerator ? <QrCode className="w-4 h-4" /> : <ScanLine className="w-4 h-4" />}
                         {isGenerator ? "Start Handover" : "Confirm Handover"}
                     </Button>

@@ -238,7 +238,7 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                {trigger || <Button variant="outline" className="gap-2"><Bike className="w-4 h-4" /> Track {variant === 'return' ? 'Return' : 'Delivery'}</Button>}
+                {trigger || <Button variant="outline" size="sm" className="gap-2"><Bike className="w-4 h-4" /> Track {variant === 'return' ? 'Return' : 'Delivery'}</Button>}
             </DialogTrigger>
             <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
                 <DialogHeader>

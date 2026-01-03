@@ -159,6 +159,17 @@ const Bookings = () => {
                         <div className="flex gap-3 mt-4">
                             <Button variant="outline" size="sm" onClick={() => navigate(`/map?id=${booking.item_id}`)}>View Listing</Button>
 
+                            {/* Review Button */}
+                            {role === 'renter' && (booking.status === 'completed' || booking.status === 'delivered') && (
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => navigate(`/map?id=${booking.item_id}&action=review&bookingId=${booking.id}`)}
+                                >
+                                    Leave Review
+                                </Button>
+                            )}
+
                             {/* Renter Actions */}
                             {role === 'renter' && (booking.status === 'accepted' || booking.status === 'picked_up' || booking.status === 'delivered') && (
                                 <div className="flex gap-2">

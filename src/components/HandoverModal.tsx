@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QrCode, ScanLine, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/config";
 
 interface HandoverModalProps {
     bookingId: string;
@@ -20,7 +21,7 @@ export function HandoverModal({ bookingId, role, onSuccess, trigger }: HandoverM
     const [inputCode, setInputCode] = useState("");
 
     // BACKEND URL - Assuming standard setup or environment variable
-    const API_URL = "http://localhost:3000";
+    const API_URL = API_BASE_URL;
 
     const handleGenerateCode = async () => {
         setIsLoading(true);

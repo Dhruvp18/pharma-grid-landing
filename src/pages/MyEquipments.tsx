@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, MapPin, IndianRupee, Store, MoreVertical } from "lucide-react";
+import { Loader2, MapPin, IndianRupee, Store, MoreVertical, Trash2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,6 +13,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 interface Item {
     id: string;
@@ -50,6 +51,25 @@ const MyEquipments = () => {
     useEffect(() => {
         fetchItems();
     }, [navigate]);
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this listing? This action cannot be undone.")) return;
+
+        try {
+            const { error } = await supabase
+                .from("items")
+                .delete()
+                .eq("id", id);
+
+            if (error) throw error;
+
+            toast.success("Item deleted successfully");
+            fetchItems();
+        } catch (error) {
+            console.error("Error deleting item:", error);
+            toast.error("Failed to delete item");
+        }
+    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -135,7 +155,14 @@ const MyEquipments = () => {
                                                 <DropdownMenuItem disabled>
                                                     Edit Details
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600" disabled>
+                                                <DropdownMenuItem disabled>
+                                                    Edit Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                    onClick={() => handleDelete(item.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4 mr-2" />
                                                     Delete Item
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>

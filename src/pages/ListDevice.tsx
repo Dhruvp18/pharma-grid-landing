@@ -19,6 +19,7 @@ import * as tt from '@tomtom-international/web-sdk-maps';
 import * as ttServices from '@tomtom-international/web-sdk-services';
 import '@tomtom-international/web-sdk-maps/dist/maps.css';
 
+import { API_BASE_URL } from "@/config";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,7 @@ const ListDevice = () => {
         });
 
         try {
-            const response = await fetch("http://localhost:3000/audit-item", {
+            const response = await fetch(`${API_BASE_URL}/audit-item`, {
                 method: "POST",
                 body: data,
             });
@@ -222,7 +223,7 @@ const ListDevice = () => {
         });
 
         try {
-            const response = await fetch("http://localhost:3000/create-listing", {
+            const response = await fetch(`${API_BASE_URL}/create-listing`, {
                 method: "POST",
                 body: data,
             });
@@ -230,7 +231,7 @@ const ListDevice = () => {
 
             if (response.ok) {
                 toast.success("Listing Published Successfully!");
-                navigate("/");
+                navigate("/my-equipments");
             } else {
                 toast.error(result.error || "Failed to publish listing");
             }

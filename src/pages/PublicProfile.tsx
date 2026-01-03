@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { API_BASE_URL } from "@/config";
 import Navbar from "@/components/Navbar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,7 @@ const PublicProfile = () => {
         setIsLoading(true);
         try {
             // 1. Fetch Profile & Stats from our new API
-            const response = await fetch(`http://127.0.0.1:8000/profile/${id}`);
+            const response = await fetch(`${API_BASE_URL}/profile/${id}`);
             if (!response.ok) throw new Error("Failed to fetch profile");
             const data = await response.json();
 
@@ -54,7 +55,7 @@ const PublicProfile = () => {
             });
 
             // 2. Fetch Reviews
-            const reviewsResponse = await fetch(`http://127.0.0.1:8000/reviews/owner/${id}`);
+            const reviewsResponse = await fetch(`${API_BASE_URL}/reviews/owner/${id}`);
             if (reviewsResponse.ok) {
                 const reviewsData = await reviewsResponse.json();
                 setReviews(reviewsData);

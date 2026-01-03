@@ -456,6 +456,45 @@ const DiscoveryMap = () => {
         handleLocationInit();
     }, [TOMTOM_API_KEY]);
 
+    // Handle Deep Linking (ID, Action, BookingID)
+    const [searchParams] = useSearchParams();
+    const urlId = searchParams.get('id');
+    const urlAction = searchParams.get('action');
+    const urlBookingId = searchParams.get('bookingId');
+
+    // Effect to handle deep linking once equipment is loaded (or if we fetch it specifically)
+    // improved logic: if URL ID exists, we try to find it in "equipment" list.
+    // If equipment list is empty (first load), we might wait or fetch it.
+    // Simple approach: When `equipment` updates, check for URL ID.
+    useEffect(() => {
+        if (urlId && equipment.length > 0) {
+            const item = equipment.find(e => e.id === urlId);
+            if (item) {
+                // If not already selected or dialog closed, open it
+                if (selectedId !== urlId || !isDialogOpen) {
+                    flyToLocation(item.lat, item.lon, item.id);
+                    fetchItemDetails(urlId); // This sets isDialogOpen(false) inside? No, we set it true below.
+                    // fetchItemDetails usually just fetches data.
+                    // ensuring dialog open:
+                    setIsDialogOpen(true);
+                }
+
+                // Handle Review Action
+                if (urlAction === 'review') {
+                    setShowReviewForm(true);
+                    if (urlBookingId) {
+                        setUserBookingId(urlBookingId);
+                    }
+                }
+            } else {
+                // Item might not be in "nearby" list if far away?
+                // For now, assume it's loaded via fetchEquipment initial call.
+                // If we want to support deep linking to items FAR away, we should fetch single item if not found.
+                // NOTE: fetchEquipment only gets nearby? "select *" in code, so gets all. OK.
+            }
+        }
+    }, [urlId, urlAction, urlBookingId, equipment]);
+
     // Update user marker position when userLocation changes
     useEffect(() => {
         if (userLocation && userMarker.current) {

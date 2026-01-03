@@ -80,7 +80,7 @@ const Navbar = () => {
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
             <Link to="/list-device">
-              <Button variant="outline" size="default">
+              <Button variant="default" size="default">
                 List Your Device
               </Button>
             </Link>
@@ -158,7 +158,7 @@ const Navbar = () => {
               ))}
               <div className="flex flex-col gap-3 pt-4">
                 <Link to="/list-device" className="w-full" onClick={() => setIsOpen(false)}>
-                  <Button variant="outline" size="default" className="w-full">
+                  <Button variant="default" size="default" className="w-full">
                     List Your Device
                   </Button>
                 </Link>

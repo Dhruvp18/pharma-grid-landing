@@ -162,18 +162,31 @@ const DiscoveryMap = () => {
 
             // Use default marker for simplicity if custom div is tricky, but TomTom default is good.
             // Actually tt.Marker() usage:
-            const marker = new tt.Marker()
-                .setLngLat([item.lon, item.lat])
-                .setPopup(new tt.Popup({ offset: 30 }).setHTML(`
+            // Create Popup Instance
+            const popup = new tt.Popup({ offset: 30 }).setHTML(`
                   <div class="p-2">
                     <h3 class="font-bold">${item.name}</h3>
                     <p class="text-sm">${item.hospitalName}</p>
-                    <p class="text-xs text-green-600">${item.available ? 'Available' : 'Unavailable'}</p>
+                    <p class="text-xs ${item.available ? 'text-green-600' : 'text-red-600'}">${item.available ? 'Available' : 'Unavailable'}</p>
                   </div>
-                `))
+                `);
+
+            // Create Marker (without Binding Popup to Click)
+            const marker = new tt.Marker()
+                .setLngLat([item.lon, item.lat])
                 .addTo(map.current!);
 
-            marker.getElement().addEventListener('click', () => {
+            // Add Hover Listeners to Marker Element
+            const element = marker.getElement();
+            element.addEventListener('mouseenter', () => {
+                popup.setLngLat([item.lon, item.lat]).addTo(map.current!);
+            });
+            element.addEventListener('mouseleave', () => {
+                popup.remove();
+            });
+
+            // Keep Click for FlyTo
+            element.addEventListener('click', () => {
                 flyToLocation(item.lat, item.lon, item.id);
             });
 
@@ -320,6 +333,7 @@ const DiscoveryMap = () => {
 
                 if (accuracy <= 50) {
                     navigator.geolocation.clearWatch(watchId);
+                    localStorage.setItem('userLocation', JSON.stringify({ lat: latitude, lon: longitude }));
                     updateMapLocation(latitude, longitude);
                     setLocationSearchQuery("Current Location");
                     toast.success(`Location locked (±${Math.round(accuracy)}m)`);
@@ -377,12 +391,12 @@ const DiscoveryMap = () => {
                 // User Location Marker
                 const markerElement = document.createElement('div');
                 markerElement.className = 'user-marker';
-                markerElement.style.width = '20px';
-                markerElement.style.height = '20px';
+                markerElement.style.width = '24px';
+                markerElement.style.height = '24px';
                 markerElement.style.borderRadius = '50%';
-                markerElement.style.backgroundColor = '#FF0000';
-                markerElement.style.border = '2px solid white';
-                markerElement.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+                markerElement.style.backgroundColor = '#4285F4';
+                markerElement.style.border = '3px solid white';
+                markerElement.style.boxShadow = '0 0 0 4px rgba(66, 133, 244, 0.3), 0 0 15px rgba(66, 133, 244, 0.5)'; // Pulse/Glow effect
 
                 const marker = new tt.Marker({ element: markerElement })
                     .setLngLat([lon, lat])
@@ -429,7 +443,22 @@ const DiscoveryMap = () => {
                 }
             }
 
-            // Fallback to Geolocation
+            // 2. Check for Cached Location
+            const cachedLocation = localStorage.getItem('userLocation');
+            if (cachedLocation) {
+                try {
+                    const { lat, lon } = JSON.parse(cachedLocation);
+                    if (lat && lon) {
+                        initializeMap(lat, lon);
+                        setLocationSearchQuery("Current Location");
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Error parsing cached location", e);
+                }
+            }
+
+            // 3. Fallback to Geolocation (Only if no cache)
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {

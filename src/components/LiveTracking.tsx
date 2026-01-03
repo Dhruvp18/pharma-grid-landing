@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as tt from '@tomtom-international/web-sdk-maps';
 import * as ttServices from '@tomtom-international/web-sdk-services';
+import '@tomtom-international/web-sdk-maps/dist/maps.css';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Bike, MapPin } from 'lucide-react';

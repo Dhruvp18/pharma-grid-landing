@@ -219,12 +219,13 @@ async def analyze_video(video: UploadFile = File(...)):
 #  FEATURE 3: QR HANDOVER LOGIC (Supabase)
 # ==========================================
 
-# 1. Generate QR Code (Called by Owner)
-# 1. Generate QR Code (Called by Owner)
+# 1. Generate QR Code (Called by Owner or Renter depending on flow)
 @app.post("/generate-handover")
 async def generate_handover(payload: dict = Body(...)):
-    # payload expects {"bookingId": ...}
+    # payload expects {"bookingId": ..., "handoverType": "pickup" | "return"}
     booking_id = payload.get("bookingId")
+    handover_type = payload.get("handoverType", "pickup") # Default to pickup for backward capability
+
     if not booking_id:
         raise HTTPException(status_code=400, detail="Missing bookingId")
 
@@ -233,40 +234,38 @@ async def generate_handover(payload: dict = Body(...)):
         secret_code = str(random.randint(100000, 999999))
 
         # Save to DB
-        response = supabase.table("bookings").update({"handover_code": secret_code}).eq("id", booking_id).execute()
+        response = supabase.table("bookings").update({
+            "handover_code": secret_code,
+            # We might want to track what THIS code is for, but assuming single active code is enough
+        }).eq("id", booking_id).execute()
         
-        # --- CRITICAL FIX START ---
-        # Supabase returns the updated rows in response.data. 
-        # If this list is empty, it means the Booking ID does not exist in the DB.
+        # Check if booking exists
         if not response.data:
             raise HTTPException(status_code=404, detail="Booking ID not found")
-        # --- CRITICAL FIX END ---
         
-        print(f"🔐 Generated Code for Booking {booking_id}: {secret_code}")
+        print(f"🔐 Generated {handover_type.upper()} Code for Booking {booking_id}: {secret_code}")
         return {"qrData": secret_code}
 
     except HTTPException as he:
-        # Allow the 404 or 400 errors to pass through to the client
         raise he
     except Exception as e:
-        # Catch unexpected server errors
         print(f"Error generating handover: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# 2. Scan QR Code (Called by Renter)
+# 2. Scan QR Code (Called by Renter or Owner depending on flow)
 @app.post("/scan-handover")
 async def scan_handover(payload: dict = Body(...)):
     booking_id = payload.get("bookingId")
     scanned_code = payload.get("scannedCode")
+    handover_type = payload.get("handoverType", "pickup")
 
     if not booking_id:
          raise HTTPException(status_code=400, detail="Missing bookingId")
 
     try:
-        # Fetch real code AND status
-        response = supabase.table("bookings").select("handover_code, status").eq("id", booking_id).execute()
+        # Fetch real code
+        response = supabase.table("bookings").select("handover_code").eq("id", booking_id).execute()
         
-        # response.data is a list of dicts
         if not response.data:
             return JSONResponse(status_code=404, content={"error": "Booking not found"})
         
@@ -277,24 +276,15 @@ async def scan_handover(payload: dict = Body(...)):
         print(f"🔍 Verifying Handover: DB='{db_code}' vs Input='{input_code}' | Status: {booking.get('status')}")
 
         # Validate
-        if db_code == input_code:
-            
-            # --- INTELLIGENT HANDOVER LOGIC ---
-            current_status = booking.get("status")
-            
-            # CASE 1: PICKUP (Transitions to 'in_use')
-            if current_status in ['accepted', 'picked_up']:
-                 supabase.table("bookings").update({
-                    "status": "in_use", 
-                    "handover_code": None
-                }).eq("id", booking_id).execute()
-                 print(f"🔓 Pickup Handover Successful for Booking {booking_id}")
-                 return {"success": True, "message": "Handover Complete! Rental Started."}
+        if str(booking.get("handover_code")) == str(scanned_code):
+            # SUCCESS: Update status
+            supabase.table("bookings").update({
+                "status": "in_use", 
+                "handover_code": None
+            }).eq("id", booking_id).execute()
 
-            else:
-                 # Fallback just in case, or if status was already in_use but code matched?
-                 return {"success": True, "message": "Code Verified."}
-
+            print(f"🔓 Handover Successful for Booking {booking_id}")
+            return {"success": True, "message": "Handover Complete!"}
         else:
             print(f"❌ Invalid Code: DB={db_code} vs Input={input_code}")
             return JSONResponse(

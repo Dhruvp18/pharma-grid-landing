@@ -215,7 +215,7 @@ const DiscoveryMap = () => {
 
     const fetchEquipment = async (lat: number, lon: number) => {
         try {
-            let query = supabase.from('items').select('*').eq('is_available', true);
+            let query = supabase.from('items').select('*, owner:profiles(full_name, phone, email)').eq('is_available', true);
 
             // Exclude own items if logged in
             const { data: { session } } = await supabase.auth.getSession();
@@ -242,7 +242,12 @@ const DiscoveryMap = () => {
                     available: item.is_available,
                     pricePerDay: item.price_per_day,
                     address: item.address_text || 'Address not available',
-                    contact: "+91 98765 43210"
+                    contact: "+91 98765 43210",
+                    owner: item.owner ? {
+                        full_name: item.owner.full_name,
+                        phone: item.owner.phone,
+                        email: item.owner.email
+                    } : undefined
                 }));
 
                 // Sort by distance
@@ -586,15 +591,14 @@ const DiscoveryMap = () => {
             // 1. Fetch Item Details
             const { data: itemData, error: itemError } = await supabase
                 .from('items')
-                .select('*')
+                .select('*, owner:profiles(full_name, phone, email)')
                 .eq('id', id)
                 .single();
 
             if (itemError) throw itemError;
             setSelectedDetailedItem(itemData);
 
-            if (itemError) throw itemError;
-            setSelectedDetailedItem(itemData);
+            // Removed redundant if(itemError) check since we throw above
 
             if (itemData.images && Array.isArray(itemData.images) && itemData.images.length > 0) {
                 console.log("Using Database Images Column:", itemData.images);
@@ -784,7 +788,7 @@ const DiscoveryMap = () => {
                                         </div>
 
                                         <div className="flex items-center justify-between mt-3">
-                                            <span className="font-bold text-primary">${item.pricePerDay}/day</span>
+                                            <span className="font-bold text-primary">₹{item.pricePerDay}/day</span>
                                             <div className="flex gap-2">
                                                 <Button
                                                     size="sm"
@@ -793,14 +797,22 @@ const DiscoveryMap = () => {
                                                 >
                                                     View Details
                                                 </Button>
-                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                                    <Navigation className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="sm" className="h-8 w-8 p-0">
+                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0" title={item.owner?.phone || "No Phone"}>
                                                     <Phone className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </div>
+
+                                        {/* Owner Details */}
+                                        {item.owner && (
+                                            <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+                                                <p className="font-semibold text-gray-700">Owner: {item.owner.full_name || "Pharma User"}</p>
+                                                <div className="flex gap-2 mt-1">
+                                                    {item.owner.phone && <span>📞 {item.owner.phone}</span>}
+                                                    {item.owner.email && <span>✉️ {item.owner.email}</span>}
+                                                </div>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             ))
@@ -820,10 +832,10 @@ const DiscoveryMap = () => {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Detail Dialog */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
                 <DialogContent
                     className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0"
                     onInteractOutside={(e) => {
@@ -914,19 +926,37 @@ const DiscoveryMap = () => {
                                                 <span className="text-xl font-bold text-primary">₹{selectedDetailedItem.price_per_day}</span>
                                             </div>
                                             <Separator className="my-3" />
-                                            {selectedDetailedItem.owner_id && (
-                                                <div className="flex items-center gap-3 mb-4 p-3 bg-secondary/20 rounded-lg">
-                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                                                        U
+                                            {selectedDetailedItem.owner && (
+                                                <div className="flex flex-col gap-2 mb-4 p-3 bg-secondary/20 rounded-lg border border-secondary/30">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary border border-primary/20">
+                                                            {(selectedDetailedItem.owner.full_name?.[0] || 'U').toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-primary">
+                                                                {selectedDetailedItem.owner.full_name || "Owner"}
+                                                            </p>
+                                                            <Link
+                                                                to={`/profile/${selectedDetailedItem.owner_id}`}
+                                                                className="text-xs text-muted-foreground hover:text-primary underline"
+                                                            >
+                                                                View Profile & Ratings
+                                                            </Link>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium">Owner</p>
-                                                        <Link
-                                                            to={`/profile/${selectedDetailedItem.owner_id}`}
-                                                            className="text-xs text-primary hover:underline font-semibold"
-                                                        >
-                                                            View Profile & Ratings
-                                                        </Link>
+                                                    <div className="text-xs text-muted-foreground space-y-1 ml-13 pl-1">
+                                                        {selectedDetailedItem.owner.phone && (
+                                                            <div className="flex items-center gap-2">
+                                                                <Phone className="w-3 h-3 text-green-600" />
+                                                                <span>{selectedDetailedItem.owner.phone}</span>
+                                                            </div>
+                                                        )}
+                                                        {selectedDetailedItem.owner.email && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-3 h-3 flex items-center justify-center">✉️</span>
+                                                                <span>{selectedDetailedItem.owner.email}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -987,15 +1017,17 @@ const DiscoveryMap = () => {
                         )}
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Contextual Chat Widget */}
-            {chatContext && (
-                <AIChatWidget
-                    key={chatContext.device_name}
-                    initialContext={chatContext}
-                />
-            )}
+            {
+                chatContext && (
+                    <AIChatWidget
+                        key={chatContext.device_name}
+                        initialContext={chatContext}
+                    />
+                )
+            }
         </>
     );
 };

@@ -13,16 +13,22 @@ interface HandoverModalProps {
     variant?: 'pickup' | 'return'; // New prop
     onSuccess?: () => void;
     trigger?: React.ReactNode;
+    variant?: 'pickup' | 'return';
 }
 
-export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, trigger }: HandoverModalProps) {
+export function HandoverModal({ bookingId, role, onSuccess, trigger, variant = 'pickup' }: HandoverModalProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
     const [inputCode, setInputCode] = useState("");
 
-    // BACKEND URL - Assuming standard setup or environment variable
+    // BACKEND URL
     const API_URL = API_BASE_URL;
+
+    // Logic: 
+    // Pickup: Owner Generates, Renter Scans
+    // Return: Renter Generates, Owner Scans
+    const isGenerator = (variant === 'pickup' && role === 'owner') || (variant === 'return' && role === 'renter');
 
     const handleGenerateCode = async () => {
         setIsLoading(true);
@@ -30,7 +36,7 @@ export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, 
             const response = await fetch(`${API_URL}/generate-handover`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ bookingId }),
+                body: JSON.stringify({ bookingId, handoverType: variant }),
             });
 
             const data = await response.json();
@@ -62,14 +68,15 @@ export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     bookingId,
-                    scannedCode: inputCode
+                    scannedCode: inputCode,
+                    handoverType: variant
                 }),
             });
 
             const data = await response.json();
 
             if (response.ok && data.success) {
-                toast.success("Handover Successful! Rental Started.");
+                toast.success(data.message || "Handover Successful!");
                 setIsOpen(false);
                 onSuccess?.();
             } else {
@@ -83,41 +90,38 @@ export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, 
         }
     };
 
+    const getTitle = () => {
+        if (variant === 'pickup') return role === 'owner' ? "Owner Handover (Pickup)" : "Renter Confirmation (Pickup)";
+        return role === 'renter' ? "Return Handover" : "Confirm Return";
+    };
+
+    const getDescription = () => {
+        if (isGenerator) return "Generate a secure code and show it to the other party to confirm handover.";
+        return "Ask the other party for the secure code and enter it below to confirm.";
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant={role === 'owner' ? "default" : "outline"} className="gap-2">
-                        {role === 'owner' ? <QrCode className="w-4 h-4" /> : <ScanLine className="w-4 h-4" />}
-                        {variant === 'pickup'
-                            ? (role === 'owner' ? "Start Handover" : "Confirm Handover")
-                            : (role === 'owner' ? "Confirm Return" : "Start Return")}
+                    <Button variant={isGenerator ? "default" : "outline"} className="gap-2">
+                        {isGenerator ? <QrCode className="w-4 h-4" /> : <ScanLine className="w-4 h-4" />}
+                        {isGenerator ? "Start Handover" : "Confirm Handover"}
                     </Button>
                 )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-md text-center">
                 <DialogHeader>
                     <DialogTitle className="text-center text-xl">
-                        {variant === 'pickup' ? (role === 'owner' ? "Owner Handover" : "Renter Confirmation")
-                            : (role === 'owner' ? "Confirm Item Return (Owner)" : "Return Item (Renter)")}
+                        {getTitle()}
                     </DialogTitle>
                     <DialogDescription className="text-center">
-                        {variant === 'pickup'
-                            ? (role === 'owner'
-                                ? "Generate a secure code and show it to the renter upon meeting."
-                                : "Ask the owner for the secure code and enter it below to start your rental.")
-                            : (role === 'owner'
-                                ? "Enter the code provided by the renter to confirm you have received the item back."
-                                : "Generate a code and show it to the owner when returning the item.")}
+                        {getDescription()}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="py-6 flex flex-col items-center justify-center space-y-6">
-                    {/* Logic Swap: 
-                        Pickup: Owner Generates (Show QR), Renter Scans (Input) 
-                        Return: Renter Generates (Show QR), Owner Scans (Input)
-                    */}
-                    {(variant === 'pickup' && role === 'owner') || (variant === 'return' && role === 'renter') ? (
+                    {isGenerator ? (
                         <>
                             {!generatedCode ? (
                                 <Button size="lg" onClick={handleGenerateCode} disabled={isLoading}>
@@ -132,8 +136,8 @@ export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, 
                                         </span>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        Show this code to the {role === 'owner' ? 'renter' : 'owner'}. <br />
-                                        Once they enter it, the {variant === 'pickup' ? 'booking will become active' : 'return will be confirmed'}.
+                                        Show this code to the {role === 'owner' ? 'Renter' : 'Owner'}. <br />
+                                        Once they enter it, the {variant === 'pickup' ? 'rental' : 'return'} will be confirmed.
                                     </p>
                                 </div>
                             )}
@@ -153,7 +157,7 @@ export function HandoverModal({ bookingId, role, variant = 'pickup', onSuccess, 
                             </div>
                             <Button className="w-full" size="lg" onClick={handleVerifyCode} disabled={isLoading}>
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                                Verify & Start Rental
+                                Verify & {variant === 'pickup' ? 'Start Rental' : 'Complete Return'}
                             </Button>
                         </div>
                     )}

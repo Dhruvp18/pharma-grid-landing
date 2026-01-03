@@ -15,7 +15,7 @@ interface LiveTrackingProps {
     pickupTime?: string;
 }
 
-export function LiveTracking({ source, destinationName, trigger, status: bookingStatus = 'accepted', onArrival, pickupTime }: LiveTrackingProps) {
+export function LiveTracking({ source, destinationName, trigger, status: bookingStatus = 'accepted', onArrival, pickupTime, variant = 'delivery' }: LiveTrackingProps & { variant?: 'delivery' | 'return' }) {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<tt.Map | null>(null);
     const bikeMarker = useRef<tt.Marker | null>(null);
@@ -25,24 +25,44 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
     const [retry, setRetry] = useState(0);
     const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
 
-    // Determine active step
+    // Define Steps based on Variant
+    const steps = variant === 'delivery'
+        ? ['Order Accepted', 'On the Way', 'Delivered']
+        : ['Return Accepted', 'On the Way', 'Returned'];
+
+    // Map Booking Status to Step Index (1, 2, 3)
     const getStep = () => {
-        if (bookingStatus === 'delivered') return 3;
-        if (bookingStatus === 'picked_up') return 2;
-        return 1;
+        if (variant === 'delivery') {
+            if (bookingStatus === 'delivered') return 3;
+            if (bookingStatus === 'picked_up') return 2;
+            return 1;
+        } else {
+            // Return Flow
+            // return_accepted -> Step 1
+            // return_picked_up -> Step 2
+            // completed -> Step 3
+            if (bookingStatus === 'completed') return 3;
+            if (bookingStatus === 'return_picked_up') return 2;
+            return 1;
+        }
     };
 
     useEffect(() => {
         if (!isOpen) return;
 
-        // If not picked up yet, don't show map logic
-        if (bookingStatus === 'accepted') {
+        const isDeliveryWait = variant === 'delivery' && bookingStatus === 'accepted';
+        const isReturnWait = variant === 'return' && (bookingStatus === 'return_requested' || bookingStatus === 'return_accepted'); // Maybe just return_accepted if we only show tracking then
+
+        // If not picked up yet (Step 1)
+        if (isDeliveryWait || (variant === 'return' && bookingStatus === 'return_accepted')) {
             setInternalStatus("Waiting for driver...");
             return;
         }
 
-        if (bookingStatus === 'delivered') {
-            setInternalStatus("Delivered");
+        const isComplete = (variant === 'delivery' && bookingStatus === 'delivered') || (variant === 'return' && bookingStatus === 'completed');
+
+        if (isComplete) {
+            setInternalStatus(variant === 'delivery' ? "Delivered" : "Returned");
             return;
         }
 
@@ -143,6 +163,11 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
                     const points = route.legs[0].points;
                     routeCoordinates = points.map(p => new tt.LngLat(p.lng || 0, p.lat || 0));
 
+                    // If returning, we animate FROM dest TO source (Reverse the path)
+                    if (variant === 'return') {
+                        routeCoordinates.reverse();
+                    }
+
                     // Create Bike Marker element
                     const el = document.createElement('div');
                     el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary fill-background"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>';
@@ -173,7 +198,7 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
                         progress = Math.min(Math.max(elapsed / duration, 0), 1); // Clamp between 0 and 1
 
                         if (progress >= 1) {
-                            if (onArrival) onArrival(); // Trigger delivery
+                            if (onArrival) onArrival(); // Trigger delivery completion
                             cancelAnimationFrame(animationFrameId);
                             return;
                         }
@@ -205,17 +230,20 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
             if (map.current) map.current.remove();
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
         };
-    }, [isOpen, source, destinationName, bookingStatus, retry]); // Re-run when status changes or retry triggers
+    }, [isOpen, source, destinationName, bookingStatus, retry, variant]); // Re-run when status changes
+
+    const isStep1 = (variant === 'delivery' && bookingStatus === 'accepted') || (variant === 'return' && bookingStatus === 'return_accepted');
+    const isStep3 = (variant === 'delivery' && bookingStatus === 'delivered') || (variant === 'return' && bookingStatus === 'completed');
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                {trigger || <Button variant="outline" className="gap-2"><Bike className="w-4 h-4" /> Track Delivery</Button>}
+                {trigger || <Button variant="outline" className="gap-2"><Bike className="w-4 h-4" /> Track {variant === 'return' ? 'Return' : 'Delivery'}</Button>}
             </DialogTrigger>
             <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex justify-between items-center pr-8">
-                        <span>Live Delivery Tracking</span>
+                        <span>Live {variant === 'return' ? 'Return' : 'Delivery'} Tracking</span>
                         <div className="flex gap-4 text-sm font-normal">
                             <div className="flex items-center gap-1 text-muted-foreground">
                                 <span className={`w-2 h-2 rounded-full ${internalStatus.includes('way') ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></span>
@@ -229,7 +257,7 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
                 <div className="flex-1 flex flex-col gap-4">
                     {/* Stepper */}
                     <div className="flex items-center justify-between px-10 py-4 bg-muted/30 relative">
-                        {['Order Accepted', 'On the Way', 'Delivered'].map((label, idx) => {
+                        {steps.map((label, idx) => {
                             const stepNum = idx + 1;
                             const currentStep = getStep();
                             return (
@@ -253,16 +281,16 @@ export function LiveTracking({ source, destinationName, trigger, status: booking
 
                     {/* Content Area */}
                     <div className="flex-1 rounded-xl overflow-hidden border border-border relative bg-muted mx-4 mb-4">
-                        {bookingStatus === 'accepted' ? (
+                        {isStep1 ? (
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-2">
                                 <Bike className="w-12 h-12 opacity-20" />
-                                <p>Waiting for driver to pickup...</p>
+                                <p>Waiting for driver to {variant === 'return' ? 'collect return' : 'pickup'}...</p>
                             </div>
-                        ) : bookingStatus === 'delivered' ? (
+                        ) : isStep3 ? (
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-emerald-600 gap-2 bg-emerald-50">
                                 <MapPin className="w-12 h-12" />
-                                <h3 className="text-xl font-bold">Delivered!</h3>
-                                <p className="text-sm text-emerald-800">Package has reached the destination.</p>
+                                <h3 className="text-xl font-bold">{variant === 'return' ? 'Returned Successfully!' : 'Delivered!'}</h3>
+                                <p className="text-sm text-emerald-800">{variant === 'return' ? 'Item has been returned to owner.' : 'Package has reached the destination.'}</p>
                             </div>
                         ) : (
                             // Map Container for "On the Way"

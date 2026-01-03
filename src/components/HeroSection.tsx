@@ -1,12 +1,20 @@
-import { Search, MapPin, ShieldCheck, Clock, Sparkles } from "lucide-react";
+import { Search, MapPin, ShieldCheck, Clock, Sparkles, AlertCircle, Wind, Truck, Bed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const HeroSection = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
+  const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
 
   const handleSearch = () => {
     if (searchQuery || locationQuery) {
@@ -15,6 +23,11 @@ const HeroSection = () => {
       navigate('/map');
     }
   };
+
+  const handleEmergencySelect = (category: string) => {
+    navigate(`/map?emergency=true&category=${encodeURIComponent(category)}`);
+  };
+
   const trustSignals = [
     { icon: Sparkles, label: "AI Verified" },
     { icon: ShieldCheck, label: "Insured" },
@@ -52,20 +65,31 @@ const HeroSection = () => {
           Rent Oxygen, Wheelchairs, and Beds instantly. Verified by AI, tracked in real-time.
         </p>
 
+        {/* Action Buttons Container */}
+        <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-10 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+          <Button
+            variant="default"
+            size="lg"
+            className="bg-primary hover:bg-primary/90 text-white rounded-full shadow-lg hover:shadow-xl transition-all w-full md:w-auto px-8"
+            onClick={() => navigate('/map')}
+          >
+            <MapPin className="w-4 h-4 mr-2" />
+            Find Equipments near me
+          </Button>
+
+          <Button
+            variant="destructive"
+            size="lg"
+            className="bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all w-full md:w-auto px-8 animate-pulse text-base font-bold"
+            onClick={() => setIsEmergencyOpen(true)}
+          >
+            <AlertCircle className="w-5 h-5 mr-2" />
+            Emergency Request
+          </Button>
+        </div>
+
         {/* Search Component */}
         <div className="max-w-3xl mx-auto mb-10 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
-          <div className="flex justify-center mb-4">
-            <Button
-              variant="default"
-              size="lg"
-              className="bg-primary hover:bg-primary/90 text-white rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
-              onClick={() => navigate('/map')}
-            >
-              <MapPin className="w-4 h-4 mr-2" />
-              Find Equipments near me
-            </Button>
-          </div>
-
           <div className="glass-card rounded-2xl p-2 md:p-3 shadow-soft-xl">
             <div className="flex flex-col md:flex-row gap-3">
               {/* What do you need */}
@@ -116,6 +140,53 @@ const HeroSection = () => {
           ))}
         </div>
       </div>
+
+      {/* Emergency Dialog */}
+      <Dialog open={isEmergencyOpen} onOpenChange={setIsEmergencyOpen}>
+        <DialogContent className="sm:max-w-md border-red-200 bg-red-50/50">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-6 h-6" />
+              Emergency Request
+            </DialogTitle>
+            <DialogDescription className="text-red-900/80 font-medium text-base">
+              What do you need immediately? We will find the closest fully-verified unit.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <button
+              onClick={() => handleEmergencySelect('Respiratory')}
+              className="flex flex-col items-center justify-center p-4 bg-white hover:bg-red-100 border border-red-200 rounded-xl transition-all shadow-sm hover:shadow-md group"
+            >
+              <div className="p-3 bg-red-100 rounded-full text-red-600 mb-2 group-hover:scale-110 transition-transform">
+                <Wind className="w-6 h-6" />
+              </div>
+              <span className="font-bold text-red-900">Oxygen / BiPAP</span>
+            </button>
+
+            <button
+              onClick={() => handleEmergencySelect('Transport')}
+              className="flex flex-col items-center justify-center p-4 bg-white hover:bg-red-100 border border-red-200 rounded-xl transition-all shadow-sm hover:shadow-md group"
+            >
+              <div className="p-3 bg-red-100 rounded-full text-red-600 mb-2 group-hover:scale-110 transition-transform">
+                <Truck className="w-6 h-6" />
+              </div>
+              <span className="font-bold text-red-900">Ambulance</span>
+            </button>
+
+            <button
+              onClick={() => handleEmergencySelect('Beds')}
+              className="flex flex-col items-center justify-center p-4 bg-white hover:bg-red-100 border border-red-200 rounded-xl transition-all shadow-sm hover:shadow-md group"
+            >
+              <div className="p-3 bg-red-100 rounded-full text-red-600 mb-2 group-hover:scale-110 transition-transform">
+                <Bed className="w-6 h-6" />
+              </div>
+              <span className="font-bold text-red-900">Hospital Bed</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };

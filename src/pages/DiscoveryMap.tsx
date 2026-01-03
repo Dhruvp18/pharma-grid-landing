@@ -419,6 +419,35 @@ const DiscoveryMap = () => {
             const params = new URLSearchParams(window.location.search);
             const urlSearchQuery = params.get('search');
             const urlLocationQuery = params.get('location');
+            const urlEmergency = params.get('emergency');
+            const urlCategory = params.get('category');
+
+            if (urlEmergency === 'true') {
+                toast.error("🚨 EMERGENCY MODE ACCEPTED", {
+                    description: `Searching for nearest ${urlCategory || 'equipment'}...`,
+                    duration: 5000,
+                    style: { background: '#fee2e2', border: '2px solid #ef4444', color: '#b91c1c' }
+                });
+
+                if (urlCategory) setSearchQuery(urlCategory);
+
+                // Force Geolocation and Initialize Map for Emergency
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            initializeMap(position.coords.latitude, position.coords.longitude);
+                        },
+                        (error) => {
+                            console.error("Emergency location error:", error);
+                            initializeMap(19.0760, 72.8777); // Fallback Mumbai
+                        },
+                        { enableHighAccuracy: true }
+                    );
+                } else {
+                    initializeMap(19.0760, 72.8777);
+                }
+                return;
+            }
 
             if (urlSearchQuery) {
                 setSearchQuery(urlSearchQuery);

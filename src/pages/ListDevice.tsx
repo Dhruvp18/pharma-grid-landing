@@ -622,8 +622,8 @@ const ListDevice = () => {
                 <title>List Your Device | Pharma-Grid</title>
             </Helmet>
 
-            <div className="min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background pt-24 pb-12 px-4">
-                <Navbar />
+            <Navbar />
+            <div className="min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background pt-8 pb-12 px-4">
 
                 <div className="max-w-3xl mx-auto">
                     {/* Header */}

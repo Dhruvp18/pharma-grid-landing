@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useSearchParams } from 'react-router-dom';
 import * as tt from '@tomtom-international/web-sdk-maps';
@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Link } from "react-router-dom";
 import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
+import Navbar from "@/components/Navbar";
 
 
 import { AIChatWidget } from "@/components/AIChatWidget";
@@ -38,8 +39,8 @@ const DiscoveryMap = () => {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [locationSearchQuery, setLocationSearchQuery] = useState("");
-    // Store ETAs for all items: itemId -> etaString
-    const [etas, setEtas] = useState<Record<string, string>>({});
+    // Store ETAs for all items: itemId -> { text: string, minutes: number }
+    const [etas, setEtas] = useState<Record<string, { text: string, minutes: number }>>({});
 
     // Detail Card State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -76,18 +77,18 @@ const DiscoveryMap = () => {
         const hours = distKm / 30;
         const minutes = Math.round(hours * 60);
 
-        if (minutes < 1) return "< 1 min";
-        if (minutes < 60) return `${minutes} mins (approx)`;
+        if (minutes < 1) return { text: "< 1 min", minutes: 0 };
+        if (minutes < 60) return { text: `${minutes} mins (approx)`, minutes };
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
-        return `${h} hr ${m} mins (approx)`;
+        return { text: `${h} hr ${m} mins (approx)`, minutes };
     };
 
     // Function to fetch ETAs for all filtered items
     const fetchAllEtas = async () => {
         if (!userLocation || filteredEquipment.length === 0 || !TOMTOM_API_KEY) return;
 
-        const newEtas: Record<string, string> = {};
+        const newEtas: Record<string, { text: string, minutes: number }> = {};
 
         // Process in parallel
         const promises = filteredEquipment.map(async (item) => {
@@ -102,11 +103,11 @@ const DiscoveryMap = () => {
                     const durationSeconds = response.routes[0].summary.travelTimeInSeconds;
                     const minutes = Math.round(durationSeconds / 60);
                     if (minutes < 60) {
-                        newEtas[item.id] = `${minutes} mins`;
+                        newEtas[item.id] = { text: `${minutes} mins`, minutes };
                     } else {
                         const hours = Math.floor(minutes / 60);
                         const remainingMins = minutes % 60;
-                        newEtas[item.id] = `${hours} hr ${remainingMins} mins`;
+                        newEtas[item.id] = { text: `${hours} hr ${remainingMins} mins`, minutes };
                     }
                 } else {
                     newEtas[item.id] = getFallbackEta(userLocation.lat, userLocation.lon, item.lat, item.lon);
@@ -651,11 +652,25 @@ const DiscoveryMap = () => {
 
         drawRoute();
     }, [selectedId, userLocation, equipment]); // Re-draw if selection or location changes
+    // Sort equipment by ETA
+    const sortedFilteredEquipment = useMemo(() => {
+        const items = [...filteredEquipment];
+        return items.sort((a, b) => {
+            const etaA = etas[a.id]?.minutes ?? Infinity;
+            const etaB = etas[b.id]?.minutes ?? Infinity;
+
+            // If ETAs are equal or both missing, keep original order (distance)
+            if (etaA === etaB) return 0;
+
+            // Sort by minutes ascending
+            return etaA - etaB;
+        });
+    }, [filteredEquipment, etas]);
 
     return (
         <>
-
-            <div className="flex flex-col h-screen md:flex-row">
+            <Navbar />
+            <div className="flex flex-col h-[calc(100vh-4rem)] md:flex-row">
                 {/* Sidebar / List View */}
                 <div className="w-full md:w-1/3 p-4 overflow-hidden bg-gray-50 border-r flex flex-col">
                     <div className="mb-4 space-y-3">
@@ -701,10 +716,10 @@ const DiscoveryMap = () => {
                     </div>
 
                     <div className="space-y-4 flex-1 overflow-y-auto">
-                        {filteredEquipment.length === 0 ? (
+                        {sortedFilteredEquipment.length === 0 ? (
                             <p className="text-center text-gray-500 mt-4">No equipment found matching your search.</p>
                         ) : (
-                            filteredEquipment.map((item) => (
+                            sortedFilteredEquipment.map((item) => (
                                 <Card
                                     key={item.id}
                                     className={`cursor-pointer transition-all hover:shadow-md ${selectedId === item.id ? 'border-primary ring-1 ring-primary' : ''}`}
@@ -726,7 +741,7 @@ const DiscoveryMap = () => {
                                         <div className="flex items-center gap-2 text-sm text-blue-600 my-2 bg-blue-50 p-2 rounded">
                                             <Clock className="h-4 w-4" />
                                             <span className="font-medium">
-                                                {etas[item.id] ? `Est. Travel: ${etas[item.id]}` : "Calculating ETA..."}
+                                                {etas[item.id] ? `Est. Travel: ${etas[item.id].text}` : "Calculating ETA..."}
                                             </span>
                                         </div>
 

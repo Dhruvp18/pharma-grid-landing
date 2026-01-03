@@ -5,6 +5,7 @@ import LiveTicker from "@/components/LiveTicker";
 import CategoryGrid from "@/components/CategoryGrid";
 import FeaturedListings from "@/components/FeaturedListings";
 import Footer from "@/components/Footer";
+import HowItWorks from "@/components/HowItWorks";
 
 const Index = () => {
   return (
@@ -23,6 +24,7 @@ const Index = () => {
         <main>
           <HeroSection />
           <LiveTicker />
+          <HowItWorks />
           <CategoryGrid />
           <FeaturedListings />
         </main>

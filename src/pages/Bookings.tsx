@@ -480,7 +480,7 @@ const Bookings = () => {
             </Helmet>
             <Navbar />
 
-            <div className="container max-w-5xl pt-24 pb-12 px-4">
+            <div className="container max-w-5xl pt-8 pb-12 px-4">
                 <h1 className="text-3xl font-bold mb-8">My Bookings</h1>
 
                 {loading ? (

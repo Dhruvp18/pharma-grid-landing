@@ -90,7 +90,7 @@ const MyEquipments = () => {
             </Helmet>
             <Navbar />
 
-            <div className="container max-w-6xl pt-24 pb-12 px-4">
+            <div className="container max-w-6xl pt-8 pb-12 px-4">
                 <div className="flex justify-between items-center mb-8">
                     <div>
                         <h1 className="text-3xl font-bold">My Equipments</h1>

@@ -23,6 +23,7 @@ interface Booking {
     item_id: string;
     delivery_method?: 'pickup' | 'delivery'; // Optional as older bookings might not have it
     delivery_address?: string;
+    updated_at?: string; // For syncing animation
     item: {
         title: string;
         image_url: string;
@@ -75,18 +76,22 @@ const Bookings = () => {
     const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
 
     const handleAccept = async (bookingId: string) => {
+        handleStatusUpdate(bookingId, 'accepted');
+    };
+
+    const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
         try {
             const { error } = await supabase
                 .from("bookings")
-                .update({ status: 'accepted' })
+                .update({ status: newStatus })
                 .eq("id", bookingId);
 
             if (error) throw error;
-            toast.success("Booking Request Accepted!");
+            toast.success(`Booking updated to ${newStatus.replace('_', ' ')}!`);
             handleRefresh();
         } catch (error) {
             console.error(error);
-            toast.error("Failed to accept booking");
+            toast.error("Failed to update booking status");
         }
     };
 
@@ -155,14 +160,25 @@ const Bookings = () => {
                             <Button variant="outline" size="sm" onClick={() => navigate(`/map?id=${booking.item_id}`)}>View Listing</Button>
 
                             {/* Renter Actions */}
-                            {role === 'renter' && booking.status === 'accepted' && (
+                            {role === 'renter' && (booking.status === 'accepted' || booking.status === 'picked_up' || booking.status === 'delivered') && (
                                 <div className="flex gap-2">
                                     {isDelivery ? (
                                         <>
-                                            <LiveTracking
-                                                source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
-                                                destinationName={booking.delivery_address || address}
-                                            />
+                                            {/* Show Tracking if picked up or delivered (or accepted to show empty state) */}
+                                            {(booking.status === 'accepted' || booking.status === 'picked_up' || booking.status === 'delivered') && (
+                                                <LiveTracking
+                                                    source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
+                                                    destinationName={booking.delivery_address || address}
+                                                    status={booking.status}
+                                                    pickupTime={booking.updated_at}
+                                                    onArrival={() => {
+                                                        // Only update if not already delivered to avoid loops
+                                                        if (booking.status !== 'delivered') {
+                                                            handleStatusUpdate(booking.id, 'delivered');
+                                                        }
+                                                    }}
+                                                />
+                                            )}
                                             <HandoverModal
                                                 bookingId={booking.id}
                                                 role="renter"
@@ -196,16 +212,40 @@ const Bookings = () => {
                                     )}
                                     {booking.status === 'accepted' && (
                                         <div className="flex gap-2">
-                                            {isDelivery && (
-                                                <Button size="sm" variant="outline" disabled>
-                                                    <Truck className="w-4 h-4 mr-2" /> Out for Delivery
+                                            {isDelivery ? (
+                                                <Button size="sm" onClick={() => handleStatusUpdate(booking.id, 'picked_up')}>
+                                                    <Truck className="w-4 h-4 mr-2" /> Mark Picked Up
                                                 </Button>
+                                            ) : (
+                                                <HandoverModal
+                                                    bookingId={booking.id}
+                                                    role="owner"
+                                                    onSuccess={handleRefresh}
+                                                />
                                             )}
-                                            <HandoverModal
-                                                bookingId={booking.id}
-                                                role="owner"
-                                                onSuccess={handleRefresh}
+                                        </div>
+                                    )}
+                                    {/* Show Tracking for Owner too if status allows */}
+                                    {isDelivery && (booking.status === 'picked_up' || booking.status === 'delivered') && (
+                                        <div className="flex gap-2">
+                                            <LiveTracking
+                                                source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
+                                                destinationName={booking.delivery_address || address}
+                                                status={booking.status}
+                                                pickupTime={booking.updated_at}
+                                                onArrival={() => {
+                                                    if (booking.status !== 'delivered') {
+                                                        handleStatusUpdate(booking.id, 'delivered');
+                                                    }
+                                                }}
                                             />
+                                            {booking.status === 'delivered' && (
+                                                <HandoverModal
+                                                    bookingId={booking.id}
+                                                    role="owner"
+                                                    onSuccess={handleRefresh}
+                                                />
+                                            )}
                                         </div>
                                     )}
                                 </>

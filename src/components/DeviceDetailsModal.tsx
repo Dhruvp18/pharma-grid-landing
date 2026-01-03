@@ -27,6 +27,7 @@ interface DeviceDetailsModalProps {
     initialData?: any;
     defaultTab?: 'details' | 'reviews';
     userBookingIdForReview?: string | null;
+    showBookingButton?: boolean;
 }
 
 export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
@@ -35,7 +36,8 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
     itemId,
     initialData,
     defaultTab = 'details',
-    userBookingIdForReview
+    userBookingIdForReview,
+    showBookingButton = true
 }) => {
     const [item, setItem] = useState<any>(initialData || null);
     const [loading, setLoading] = useState(false);
@@ -254,13 +256,15 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                                         )}
 
                                         <div className="flex gap-2">
-                                            <BookingModal
-                                                item={item}
-                                                onSuccess={() => {
-                                                    onClose();
-                                                    toast.success("Booking request sent!");
-                                                }}
-                                            />
+                                            {showBookingButton && (
+                                                <BookingModal
+                                                    item={item}
+                                                    onSuccess={() => {
+                                                        onClose();
+                                                        toast.success("Booking request sent!");
+                                                    }}
+                                                />
+                                            )}
                                             <Button
                                                 variant="outline"
                                                 className="border-teal-600 text-teal-700 hover:bg-teal-50"

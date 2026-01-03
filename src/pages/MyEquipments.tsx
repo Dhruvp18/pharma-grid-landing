@@ -203,6 +203,7 @@ const MyEquipments = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 itemId={viewingItemId}
+                showBookingButton={false}
             />
         </div>
     );

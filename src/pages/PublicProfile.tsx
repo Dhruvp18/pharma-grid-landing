@@ -217,6 +217,7 @@ const PublicProfile = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 itemId={viewingItemId}
+                showBookingButton={false}
             />
         </div>
     );

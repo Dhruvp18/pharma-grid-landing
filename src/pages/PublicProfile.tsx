@@ -68,8 +68,8 @@ const PublicProfile = () => {
             const { data: itemsData } = await supabase
                 .from("items")
                 .select("*")
-                .eq("owner_id", id)
-                .eq("is_available", true); // Only active listings
+                .eq("owner_id", id);
+            // .eq("is_available", true); // REMOVED: Show all listings
 
             if (itemsData) setItems(itemsData);
 
@@ -147,7 +147,7 @@ const PublicProfile = () => {
                     <div className="flex flex-col gap-2 min-w-[150px]">
                         <div className="bg-primary/5 rounded-xl p-4 text-center">
                             <p className="text-2xl font-bold text-primary">{items.length}</p>
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Active Listings</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Listings</p>
                         </div>
                     </div>
                 </div>
@@ -163,7 +163,7 @@ const PublicProfile = () => {
                         {items.length === 0 ? (
                             <div className="text-center py-12 border-2 border-dashed rounded-xl">
                                 <Store className="w-10 h-10 mx-auto text-muted-foreground mb-3 opacity-20" />
-                                <p className="text-muted-foreground">No active listings at the moment.</p>
+                                <p className="text-muted-foreground">No listings at the moment.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -179,7 +179,7 @@ const PublicProfile = () => {
                                         <div className="aspect-[4/3] overflow-hidden relative bg-gray-100">
                                             <img
                                                 src={item.image_url || "https://images.unsplash.com/photo-1584515933487-779824d29309?w=400&auto=format&fit=crop"}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${!item.is_available ? 'grayscale-[0.5]' : ''}`}
                                                 alt={item.title}
                                             />
                                             <div className="absolute top-2 right-2">
@@ -194,7 +194,11 @@ const PublicProfile = () => {
                                             </div>
                                             <div className="flex items-center justify-between font-medium">
                                                 <span className="text-primary">₹{item.price_per_day}/day</span>
-                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Available</span>
+                                                {item.is_available ? (
+                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Available</span>
+                                                ) : (
+                                                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">In Use</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

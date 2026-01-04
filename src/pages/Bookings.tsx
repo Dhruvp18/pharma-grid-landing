@@ -236,7 +236,7 @@ const Bookings = () => {
                             </div>
                         </div>
 
-                        <div className="flex gap-3 mt-4">
+                        <div className="flex gap-3 mt-4 items-center">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -436,7 +436,7 @@ const Bookings = () => {
                                     )}
 
                                     {(booking.status === 'return_accepted' || booking.status === 'return_picked_up' || booking.status === 'return_delivered') && (
-                                        <div className="flex gap-2 mt-2">
+                                        <div className="flex gap-2">
                                             <LiveTracking
                                                 source={{ lat: booking.item.lat || 19.0760, lng: booking.item.lng || 72.8777 }}
                                                 destinationName={booking.delivery_address || address}

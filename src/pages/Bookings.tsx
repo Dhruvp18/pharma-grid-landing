@@ -367,7 +367,6 @@ const Bookings = () => {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
                                     onClick={() => handleDownloadInvoice(booking, 'RETURN')}
                                     disabled={generatingInvoiceId === `${booking.id}-RETURN`}
                                 >

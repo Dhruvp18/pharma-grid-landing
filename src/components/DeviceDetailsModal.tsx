@@ -315,15 +315,14 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                         <div className="p-6 text-center text-muted-foreground">Item not found</div>
                     )}
                 </div>
+                {/* Contextual Chat Widget */}
+                {chatContext && (
+                    <AIChatWidget
+                        key={chatContext.device_name}
+                        initialContext={chatContext}
+                    />
+                )}
             </DialogContent>
-
-            {/* Contextual Chat Widget */}
-            {chatContext && (
-                <AIChatWidget
-                    key={chatContext.device_name}
-                    initialContext={chatContext}
-                />
-            )}
         </Dialog>
     );
 };

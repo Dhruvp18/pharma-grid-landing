@@ -86,7 +86,7 @@ const Bookings = () => {
         // Fetch My Orders (I am the Renter)
         const { data: myOrders } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), owner:profiles!owner_id(full_name, phone, email)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), owner:profiles!owner_id(full_name, phone, email), renter:profiles!renter_id(full_name, phone, email)`)
             .eq("renter_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -95,7 +95,7 @@ const Bookings = () => {
         // Fetch My Hosting (I am the Owner)
         const { data: myHosting } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), renter:profiles!renter_id(full_name, phone, email)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), renter:profiles!renter_id(full_name, phone, email), owner:profiles!owner_id(full_name, phone, email)`)
             .eq("owner_id", session.user.id)
             .order("created_at", { ascending: false });
 

@@ -49,6 +49,7 @@ const ListDevice = () => {
         category: "",
         description: "",
         price: "",
+        deposit: "", // New State
         location: "",
         contact_email: "",
         contact_phone: "",
@@ -176,6 +177,7 @@ const ListDevice = () => {
         data.append("category", formData.category);
         data.append("description", formData.description);
         data.append("price", formData.price);
+        data.append("deposit", formData.deposit); // Pass to backend
         data.append("location", formData.location);
         data.append("contact_email", formData.contact_email);
         data.append("contact_phone", formData.contact_phone);
@@ -524,7 +526,23 @@ const ListDevice = () => {
                             className="pl-8"
                             placeholder="e.g. 500"
                             value={formData.price}
+                            aria-label="Daily Rental Price"
                             onChange={(e) => handleInputChange("price", e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="deposit">Security Deposit (Refundable)</Label>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                        <Input
+                            id="deposit"
+                            type="number"
+                            className="pl-8"
+                            placeholder="e.g. 2000"
+                            value={formData.deposit}
+                            onChange={(e) => handleInputChange("deposit", e.target.value)}
                         />
                     </div>
                 </div>

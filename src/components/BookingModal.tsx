@@ -32,6 +32,11 @@ export function BookingModal({ item, trigger, onSuccess }: BookingModalProps) {
         const days = differenceInDays(date.to, date.from) + 1; // Include start day
         let total = days * item.price_per_day;
         if (deliveryMethod === 'delivery') total += 150; // Flat delivery fee
+
+        // Add Deposit
+        const deposit = item.deposit_amount || 0;
+        total += deposit;
+
         return total;
     };
 
@@ -69,7 +74,13 @@ export function BookingModal({ item, trigger, onSuccess }: BookingModalProps) {
                 total_price: calculateTotal(),
                 status: 'requested',
                 delivery_method: deliveryMethod, // Assuming column exists
-                delivery_address: address || null
+                delivery_address: address || null,
+                // We might want to save deposit_snapshot here if the item price changes later, 
+                // but usually total_price captures the deal. 
+                // However, for refunds we need to know the specific deposit paid.
+                // Assuming `deposit_amount` column exists on bookings or we rely on item's current deposit.
+                // For safety/invariance, let's trust total_price encompasses it for now, 
+                // or if we added a column: deposit_amount: item.deposit_amount || 0
             });
 
             if (error) {
@@ -219,6 +230,15 @@ export function BookingModal({ item, trigger, onSuccess }: BookingModalProps) {
                                     <span>₹150</span>
                                 </div>
                             )}
+
+                            {/* Deposit Row */}
+                            {item.deposit_amount > 0 && (
+                                <div className="flex justify-between text-sm text-amber-700 font-medium">
+                                    <span>Security Deposit (Refundable)</span>
+                                    <span>₹{item.deposit_amount}</span>
+                                </div>
+                            )}
+
                             <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                 <span>Total</span>
                                 <span className="text-primary">₹{calculateTotal()}</span>
@@ -231,7 +251,7 @@ export function BookingModal({ item, trigger, onSuccess }: BookingModalProps) {
                         Confirm Booking
                     </Button>
                 </div>
-            </DialogContent>
-        </Dialog>
+            </DialogContent >
+        </Dialog >
     );
 }

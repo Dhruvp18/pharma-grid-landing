@@ -27,6 +27,7 @@ interface Booking {
     item_id: string;
     delivery_method?: 'pickup' | 'delivery'; // Optional as older bookings might not have it
     delivery_address?: string;
+    deduction_amount?: number; // New Field from DB
     updated_at?: string; // For syncing animation
     rental_invoice_url?: string;
     return_invoice_url?: string;
@@ -34,6 +35,8 @@ interface Booking {
         title: string;
         image_url: string;
         address_text: string;
+        price_per_day: number;
+        deposit_amount?: number; // New Field from DB
         lat?: number; // Needed for tracking source
         lng?: number; // Needed for tracking source
     };
@@ -86,7 +89,7 @@ const Bookings = () => {
         // Fetch My Orders (I am the Renter)
         const { data: myOrders } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), owner:profiles!owner_id(full_name, phone, email), renter:profiles!renter_id(full_name, phone, email)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category, price_per_day, deposit_amount), owner:profiles!owner_id(full_name, phone, email), renter:profiles!renter_id(full_name, phone, email)`)
             .eq("renter_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -95,7 +98,7 @@ const Bookings = () => {
         // Fetch My Hosting (I am the Owner)
         const { data: myHosting } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), renter:profiles!renter_id(full_name, phone, email), owner:profiles!owner_id(full_name, phone, email)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category, price_per_day, deposit_amount), renter:profiles!renter_id(full_name, phone, email), owner:profiles!owner_id(full_name, phone, email)`)
             .eq("owner_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -254,8 +257,15 @@ const Bookings = () => {
                 itemAddress: booking.item?.address_text || "N/A",
                 startDate: booking.start_date,
                 endDate: booking.end_date,
-                pricePerDay: booking.total_price / (Math.ceil(Math.abs(new Date(booking.end_date).getTime() - new Date(booking.start_date).getTime()) / (1000 * 60 * 60 * 24)) || 1), // Approx reverse calc
+                pricePerDay: booking.item?.price_per_day || 0, // changing to explicit price fetch if possible, or fallback to reverse calc if needed. But we fetched price_per_day now.
+                // Note: invoiceGenerator now expects pricePerDay logic. 
+                // Let's pass the fetched price if available, else calc.
+                // Actually we added price_per_day to query.
+
                 totalAmount: booking.total_price,
+                depositAmount: booking.item?.deposit_amount || 0,
+                deductionAmount: booking.deduction_amount || 0,
+
                 type: type,
                 penalties: []
             };

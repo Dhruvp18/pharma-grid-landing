@@ -86,7 +86,10 @@ export const ReturnRequestModal = ({ isOpen, onClose, bookingId, itemId, onSucce
             // Update booking status
             const { error } = await supabase
                 .from("bookings")
-                .update({ status: 'return_requested' })
+                .update({
+                    status: 'return_requested',
+                    deduction_amount: auditResult?.suggested_deduction || 0 // Save deduction to DB
+                })
                 .eq("id", bookingId);
 
             if (error) throw error;

@@ -218,6 +218,12 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                                             <span className="text-muted-foreground">Price per Day</span>
                                             <span className="text-xl font-bold text-primary">₹{item.price_per_day}</span>
                                         </div>
+                                        {item.deposit_amount > 0 && (
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-sm text-muted-foreground">Security Deposit (Refundable)</span>
+                                                <span className="text-sm font-semibold text-amber-700">₹{item.deposit_amount}</span>
+                                            </div>
+                                        )}
                                         <Separator className="my-3" />
                                         {item.owner && (
                                             <div className="flex flex-col gap-2 mb-4 p-3 bg-secondary/20 rounded-lg border border-secondary/30">

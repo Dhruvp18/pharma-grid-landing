@@ -15,6 +15,8 @@ export interface InvoiceData {
     endDate: string;
     pricePerDay: number;
     totalAmount: number;
+    depositAmount?: number; // New Field
+    deductionAmount?: number; // New Field
     type: 'RENTAL' | 'RETURN';
     penalties?: {
         description: string;
@@ -84,17 +86,99 @@ export const generateInvoiceBlob = async (data: InvoiceData): Promise<Blob> => {
 
     let subtotal = diffDays * data.pricePerDay;
 
-    // 2. Penalties (For Return Invoice)
-    if (data.type === 'RETURN' && data.penalties && data.penalties.length > 0) {
-        data.penalties.forEach(p => {
+    // 2. Deposit (Add to Rental Invoice)
+    if (data.type === 'RENTAL' && data.depositAmount && data.depositAmount > 0) {
+        body.push([
+            `Security Deposit (Refundable)`,
+            `1`,
+            `Rs. ${data.depositAmount}`,
+            `Rs. ${data.depositAmount.toFixed(2)}`
+        ]);
+        subtotal += data.depositAmount;
+    }
+
+    // 3. Deduction / Refund Logic (For Return Invoice)
+    if (data.type === 'RETURN') {
+        const deposit = data.depositAmount || 0;
+        const deduction = data.deductionAmount || 0;
+
+        // Show Deposit Credit
+        body.push([
+            `Deposit Credit`,
+            `1`,
+            `Rs. ${deposit}`,
+            `Rs. -${deposit.toFixed(2)}` // Negative to show it's being returned (or used)
+        ]);
+
+        // Show Deduction
+        if (deduction > 0) {
             body.push([
-                `Penalty: ${p.description}`,
-                '1',
-                `Rs. ${p.amount}`,
-                `Rs. ${p.amount.toFixed(2)}`
+                `Damage Deduction`,
+                `1`,
+                `Rs. ${deduction}`,
+                `Rs. ${deduction.toFixed(2)}`
             ]);
-            subtotal += p.amount;
-        });
+            // Deduction adds to what user OWES, but deposit subtracts. 
+            // Wait, Invoice total usually means "Amount Due".
+            // If Deposit (Credit) > Deduction (Charge), Total is Negative (Refund to user).
+            // If Deduction > Deposit, Total is Positive (User pays more).
+
+            // Let's model it as:
+            // Subtotal starts at 0 for return invoice (usually).
+            // Credit: -Deposit
+            // Charge: +Deduction
+            // Total: Deduction - Deposit.
+
+            // However, the `subtotal` variable currently includes Rental fee from line 85.
+            // Return invoice shouldn't re-charge rental fee unless it wasn't paid? 
+            // Usually Rental Invoice is at start. Return Invoice is at end.
+            // Let's RESET subtotal for RETURN invoice to avoid double counting rent if this is just a settlement invoice.
+            // The prompt says "deposit amt should be added in the rental invoice and then after the return if any defect the deposit amt should be cut from the return invoice".
+
+            // Implementation:
+            // Clear previous subtotal for Return Invoice to focus on settlement
+            subtotal = 0;
+
+            body.push([
+                `Refundable Deposit`,
+                `1`,
+                `Rs. ${deposit}`,
+                `Rs. -${deposit.toFixed(2)}`
+            ]);
+
+            body.push([
+                `Damage Deduction`,
+                `1`,
+                `Rs. ${deduction}`,
+                `Rs. ${deduction.toFixed(2)}`
+            ]);
+
+            subtotal = deduction - deposit;
+
+        } else {
+            // Full Refund case
+            subtotal = 0;
+            body.push([
+                `Refundable Deposit`,
+                `1`,
+                `Rs. ${deposit}`,
+                `Rs. -${deposit.toFixed(2)}`
+            ]);
+            subtotal = -deposit;
+        }
+    } else {
+        // RENTAL: Checks for penalties not usually relevant at start, but if any
+        if (data.penalties && data.penalties.length > 0) {
+            data.penalties.forEach(p => {
+                body.push([
+                    `Penalty: ${p.description}`,
+                    '1',
+                    `Rs. ${p.amount}`,
+                    `Rs. ${p.amount.toFixed(2)}`
+                ]);
+                subtotal += p.amount;
+            });
+        }
     }
 
     autoTable(doc, {

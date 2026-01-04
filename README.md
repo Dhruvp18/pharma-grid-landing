@@ -7,7 +7,7 @@ Pharma Grid is a comprehensive platform designed to bridge the gap between medic
 Pharma Grid solves the challenge of finding reliable, affordable medical equipment by creating a localized marketplace. Whether it's a hospital bed, an oxygen concentrator, or a simple wheelchair, Pharma Grid allows users to:
 - **Discover** equipment nearby using an interactive map.
 - **Rent or Buy** devices with transparent pricing.
-- **Verify** quality via AI-driven image and video audits.
+- **Verify** quality via AI-driven image audits using Vision-Guard AI.
 - **Secure** transactions with QR-code based handovers.
 - **Consult** an AI Medical Companion for device usage and general health queries.
 
@@ -56,7 +56,7 @@ Pharma Grid solves the challenge of finding reliable, affordable medical equipme
 ## 📦 Installation & Setup
 
 ### Prerequisites
-- Node.js & npm
+- npm
 - Python 3.8+
 - Supabase Account (for Database & Auth)
 - Google Gemini API Key
@@ -123,6 +123,3 @@ uvicorn main:app --reload --port 3000
 
 - [Dhruv Panchal](https://github.com/Dhruvp18)
 - [Viraj Vora](https://github.com/viraj200524)
-
-## 📄 License
-This project is open-source and available under the MIT License.

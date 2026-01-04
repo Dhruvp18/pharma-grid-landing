@@ -443,6 +443,7 @@ async def create_listing(
     category: str = Form(...),
     description: str = Form(...),
     price: str = Form(...),
+    deposit: str = Form("0"), # New Field: Deposit Amount
     location: str = Form(...),
     lat: Optional[str] = Form(None),
     lng: Optional[str] = Form(None),
@@ -500,6 +501,7 @@ async def create_listing(
             "category": category,
             "description": description,
             "price_per_day": float(price) if price else 0,
+            "deposit_amount": float(deposit) if deposit else 0, # New Field
             "address_text": location,
             "lat": float(lat) if lat else None,
             "lng": float(lng) if lng else None,

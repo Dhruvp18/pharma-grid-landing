@@ -1,73 +1,128 @@
-# Welcome to your Lovable project
+# Pharma Grid 🏥
 
-## Project info
+Pharma Grid is a comprehensive platform designed to bridge the gap between medical equipment owners and those in need. It facilitates the rental, sale, and verified exchange of medical devices, ensuring safety and trust through AI-powered auditing and secure logistics.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🌟 Product Overview
 
-## How can I edit this code?
+Pharma Grid solves the challenge of finding reliable, affordable medical equipment by creating a localized marketplace. Whether it's a hospital bed, an oxygen concentrator, or a simple wheelchair, Pharma Grid allows users to:
+- **Discover** equipment nearby using an interactive map.
+- **Rent or Buy** devices with transparent pricing.
+- **Verify** quality via AI-driven image and video audits.
+- **Secure** transactions with QR-code based handovers.
+- **Consult** an AI Medical Companion for device usage and general health queries.
 
-There are several ways of editing your application.
+## 🚀 Key Features
 
-**Use Lovable**
+### 🔍 Discovery & Marketplace
+- **Interactive Map**: Visualize available equipment in your vicinity using TomTom maps integration.
+- **Detailed Listings**: View comprehensive item details, including specifications, pricing, and availability.
+- **Advanced Search**: Filter by equipment type, hospital name, or specific requirements.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 🛡️ AI Safety Ecosystem
+- **Universal Medical Auditor**: Automatically identifies medical devices from uploaded photos and performs a dynamic safety check (e.g., checking for frayed wires in electronics or worn rubber in mobility aids).
+- **Return Item Auditor**: Compares "Return" photos against "Original" listing photos to detect new damages and suggest fair deposit deductions.
+- **Video Analysis**: (Beta) Analyzes video feeds for operational flaws like wobbling wheels or strange noises.
 
-Changes made via Lovable will be committed automatically to this repo.
+### 🔐 Secure Logistics
+- **QR Handover System**: Generates secure 6-digit codes for both pickup and return handovers to ensure physical item transfer before status updates.
+- **Booking Management**: Track rental durations, overdue penalties, and completion statuses.
 
-**Use your preferred IDE**
+### 🤖 Smart Assistance
+- **AI Medical Companion**: A built-in chat widget powered by Google Gemini to answer questions about device usage, medical terms, or general health advice.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 👤 User Features
+- **Public Profiles**: Build trust with verified profiles and aggregated user ratings.
+- **Review System**: Leave feedback for items and owners to help the community make informed decisions.
+- **Dashboard**: Manage your listings, bookings, and return requests in one place.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Tech Stack
 
-Follow these steps:
+### Frontend
+- **Framework**: React 18 (Vite)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS, Shadcn UI, Radix UI
+- **Maps**: TomTom International Web SDK
+- **State Management**: React Query (@tanstack/react-query)
+- **Forms**: React Hook Form + Zod
+- **Routing**: React Router DOM v6
+- **Icons**: Lucide React
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Backend (`pharma-backend`)
+- **Framework**: FastAPI (Python)
+- **AI**: Google Gemini (via `google-generativeai`), Agno Agent Framework
+- **Database**: Supabase (PostgreSQL)
+- **Server**: Uvicorn
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 📦 Installation & Setup
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Prerequisites
+- Node.js & npm
+- Python 3.8+
+- Supabase Account (for Database & Auth)
+- Google Gemini API Key
+- TomTom Developer Key
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd pharma-grid-landing
+```
+
+### 2. Frontend Setup
+Navigate to the root directory and install dependencies:
+```bash
+npm install
+```
+
+Create a `.env` file in the root directory:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_TOMTOM_API_KEY=your_tomtom_api_key
+```
+
+Run the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### 3. Backend Setup
+Navigate to the backend directory:
+```bash
+cd pharma-backend
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-**Use GitHub Codespaces**
+Ensure your `.env` file (in the project root) also contains backend keys:
+```env
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key (Optional, for admin tasks)
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Run the backend server:
+```bash
+# Using Python directly
+python main.py
 
-## What technologies are used for this project?
+# OR using Uvicorn
+uvicorn main:app --reload --port 3000
+```
 
-This project is built with:
+## 🧪 Usage Flow
+1.  **Register/Login**: Sign up using your email via Supabase Auth.
+2.  **List an Item**: Go to "List Device", upload photos (which are auto-audited by AI), and set your price.
+3.  **Rent**: Browse the map, select an item, and request a booking.
+4.  **Pickup**: Meet the owner. The owner scans your "Pickup QR Code" to start the rental.
+5.  **Return**: Meet the owner again. Upload return photos for AI damage check. The owner scans your "Return QR Code" to complete the transaction.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Contributors
 
-## How can I deploy this project?
+- [Dhruv Panchal](https://github.com/Dhruvp18)
+- [Viraj Vora](https://github.com/viraj200524)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 📄 License
+This project is open-source and available under the MIT License.

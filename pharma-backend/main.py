@@ -19,10 +19,18 @@ load_dotenv(dotenv_path=env_path)
 
 app = FastAPI()
 
-# Input Size Limit is handled by web server (e.g. Nginx, or Uvicorn). 
 # FastAPI defers this to the ASGI server. Uvicorn default is fine for normal use, 
 # but for 50MB uploads we might rely on default behavior which doesn't strictly impose 
 # limits unless configured.
+
+# --- LOGGING FIX FOR RENDER ---
+import sys
+# Force unbuffered output so print() shows up in Render logs immediately
+sys.stdout.reconfigure(line_buffering=True)
+
+@app.get("/")
+def health_check():
+    return {"status": "ok", "service": "Pharma Grid Backend"}
 
 # CORS Setup
 app.add_middleware(

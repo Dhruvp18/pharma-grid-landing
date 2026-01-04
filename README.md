@@ -123,6 +123,3 @@ uvicorn main:app --reload --port 3000
 
 - [Dhruv Panchal](https://github.com/Dhruvp18)
 - [Viraj Vora](https://github.com/viraj200524)
-
-## 📄 License
-This project is open-source and available under the MIT License.

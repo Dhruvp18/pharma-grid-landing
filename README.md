@@ -1,5 +1,7 @@
 # Pharma Grid 🏥
 
+[🚀 Live Deployment](https://pharma-grid.vercel.app/) | [🎥 Demo Video](https://drive.google.com/file/d/1aw6t6R9qW0JJjwDAL3EbMeFWE8Kp6-pv/view?usp=sharing)
+
 Pharma Grid is a comprehensive platform designed to bridge the gap between medical equipment owners and those in need. It facilitates the rental, sale, and verified exchange of medical devices, ensuring safety and trust through AI-powered auditing and secure logistics.
 
 ## 🌟 Product Overview

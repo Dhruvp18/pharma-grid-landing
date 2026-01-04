@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { API_BASE_URL } from "@/config";
 import { DeviceDetailsModal } from "@/components/DeviceDetailsModal";
 import { ReturnRequestModal } from "@/components/ReturnRequestModal";
+import { generateInvoiceBlob } from "@/utils/invoiceGenerator";
 
 interface Booking {
     id: string;
@@ -27,6 +28,8 @@ interface Booking {
     delivery_method?: 'pickup' | 'delivery'; // Optional as older bookings might not have it
     delivery_address?: string;
     updated_at?: string; // For syncing animation
+    rental_invoice_url?: string;
+    return_invoice_url?: string;
     item: {
         title: string;
         image_url: string;
@@ -35,6 +38,18 @@ interface Booking {
         lng?: number; // Needed for tracking source
     };
     contact_phone?: string;
+    owner_id?: string; // These are foreign keys, but we fetch objects via join below
+    renter_id?: string;
+    owner?: {
+        full_name: string;
+        phone?: string;
+        email?: string;
+    };
+    renter?: {
+        full_name: string;
+        phone?: string;
+        email?: string;
+    };
 }
 
 import { AIChatWidget } from "@/components/AIChatWidget";
@@ -54,6 +69,8 @@ const Bookings = () => {
     const [returnBookingId, setReturnBookingId] = useState<string | null>(null);
     const [returnItemId, setReturnItemId] = useState<string | null>(null);
 
+    const [generatingInvoiceId, setGeneratingInvoiceId] = useState<string | null>(null);
+
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const currentTab = searchParams.get("tab") || "orders";
@@ -69,7 +86,7 @@ const Bookings = () => {
         // Fetch My Orders (I am the Renter)
         const { data: myOrders } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), owner:profiles!owner_id(full_name, phone, email), renter:profiles!renter_id(full_name, phone, email)`)
             .eq("renter_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -78,7 +95,7 @@ const Bookings = () => {
         // Fetch My Hosting (I am the Owner)
         const { data: myHosting } = await supabase
             .from("bookings")
-            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category)`)
+            .select(`*, item:items(title, image_url, address_text, lat, lng, description, category), renter:profiles!renter_id(full_name, phone, email), owner:profiles!owner_id(full_name, phone, email)`)
             .eq("owner_id", session.user.id)
             .order("created_at", { ascending: false });
 
@@ -185,6 +202,82 @@ const Bookings = () => {
         }
     };
 
+    const handleDownloadInvoice = async (booking: Booking, type: 'RENTAL' | 'RETURN') => {
+        try {
+            setGeneratingInvoiceId(`${booking.id}-${type}`);
+
+            // 1. Check if already exists in DB
+            const urlField = type === 'RENTAL' ? 'rental_invoice_url' : 'return_invoice_url';
+            const existingUrl = booking[urlField];
+
+            if (existingUrl) {
+                window.open(existingUrl, '_blank');
+                return;
+            }
+
+            // 2. Generate PDF Blob
+            // Fetch names from the joined profile objects. Fallback to generic if missing.
+            const renterName = booking.renter?.full_name || "Valued Customer";
+            const ownerName = booking.owner?.full_name || "Equipment Owner";
+            const renterPhone = booking.renter?.phone || booking.contact_phone || undefined;
+            const ownerPhone = booking.owner?.phone || undefined;
+
+            const invoiceData = {
+                invoiceNo: type === 'RENTAL' ? `RENT-${booking.id.slice(0, 8)}` : `RET-${booking.id.slice(0, 8)}`,
+                date: new Date(),
+                renterName: renterName,
+                renterPhone: renterPhone,
+                ownerName: ownerName,
+                ownerPhone: ownerPhone,
+                itemName: booking.item?.title || "Medical Equipment",
+                itemAddress: booking.item?.address_text || "N/A",
+                startDate: booking.start_date,
+                endDate: booking.end_date,
+                pricePerDay: booking.total_price / (Math.ceil(Math.abs(new Date(booking.end_date).getTime() - new Date(booking.start_date).getTime()) / (1000 * 60 * 60 * 24)) || 1), // Approx reverse calc
+                totalAmount: booking.total_price,
+                type: type,
+                penalties: []
+            };
+
+            const blob = await generateInvoiceBlob(invoiceData);
+
+            // 3. Upload to Supabase Storage
+            const fileName = `invoices/${type.toLowerCase()}_${booking.id}_${Date.now()}.pdf`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('invoices')
+                .upload(fileName, blob, {
+                    contentType: 'application/pdf',
+                    upsert: true
+                });
+
+            if (uploadError) throw uploadError;
+
+            // 4. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('invoices')
+                .getPublicUrl(fileName);
+
+            // 5. Update Booking Record
+            const { error: updateError } = await supabase
+                .from('bookings')
+                .update({ [urlField]: publicUrl })
+                .eq('id', booking.id);
+
+            if (updateError) throw updateError;
+
+            // 6. Refresh Local State & Open
+            toast.success(`${type === 'RENTAL' ? 'Rental' : 'Return'} Invoice Generated!`);
+            handleRefresh(); // To update the local booking object with the new URL
+            window.open(publicUrl, '_blank');
+
+        } catch (error: any) {
+            console.error("Invoice generation error:", error);
+            toast.error("Failed to generate invoice: " + error.message);
+        } finally {
+            setGeneratingInvoiceId(null);
+        }
+    };
+
     const BookingCard = ({ booking, role }: { booking: Booking, role: 'renter' | 'owner' }) => {
         const itemTitle = booking.item?.title || "Unknown Item";
         const itemImage = booking.item?.image_url || "https://images.unsplash.com/photo-1584515933487-779824d29309?w=800&auto=format&fit=crop";
@@ -234,6 +327,33 @@ const Bookings = () => {
                                 <IndianRupee className="w-4 h-4 text-primary" />
                                 <span className="font-semibold">₹{booking.total_price}</span>
                             </div>
+                        </div>
+
+                        {/* Invoice Buttons */}
+                        <div className="flex gap-2 mb-4">
+                            {['accepted', 'in_use', 'completed', 'delivered', 'picked_up', 'return_requested', 'return_accepted', 'return_picked_up', 'return_delivered', 'returned'].includes(booking.status) && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadInvoice(booking, 'RENTAL')}
+                                    disabled={generatingInvoiceId === `${booking.id}-RENTAL`}
+                                >
+                                    {generatingInvoiceId === `${booking.id}-RENTAL` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <IndianRupee className="w-3 h-3 mr-1" />}
+                                    Rental Invoice
+                                </Button>
+                            )}
+                            {booking.status === 'returned' && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                                    onClick={() => handleDownloadInvoice(booking, 'RETURN')}
+                                    disabled={generatingInvoiceId === `${booking.id}-RETURN`}
+                                >
+                                    {generatingInvoiceId === `${booking.id}-RETURN` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                    Return Invoice
+                                </Button>
+                            )}
                         </div>
 
                         <div className="flex gap-3 mt-4 items-center">

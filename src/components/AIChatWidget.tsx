@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { API_BASE_URL } from "@/config";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, X, Send, Bot, Stethoscope } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
@@ -52,7 +53,7 @@ export const AIChatWidget = ({ initialContext, triggerLabel, className }: AIChat
 
         try {
             // Call Backend Endpoint
-            const response = await fetch('http://127.0.0.1:3000/chat-ai', {
+            const response = await fetch(`${API_BASE_URL}/chat-ai`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

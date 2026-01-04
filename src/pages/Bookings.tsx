@@ -90,6 +90,27 @@ const Bookings = () => {
         fetchBookings();
     }, [navigate, refreshTrigger]);
 
+    useEffect(() => {
+        const channel = supabase
+            .channel('public:bookings')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'bookings'
+                },
+                () => {
+                    handleRefresh();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
     const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
 
     const handleAccept = async (bookingId: string) => {

@@ -1,0 +1,8 @@
+# .ai-reviewer.yaml
+rules:
+  - "Naming: Use PascalCase for all React Components."
+  - "Security: Strictly forbid 'dangerouslySetInnerHTML'."
+  - "Style: No console.logs allowed in production code."
+  - "Stack: React, Vite, Supabase"
+  - "Check for proper variable naming."
+  - "Ensure no hardcoded secrets."
